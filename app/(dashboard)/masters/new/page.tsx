@@ -1,21 +1,18 @@
 "use client";
 
-import { useForm, useFieldArray, Controller } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
-import { useStore, MASTER_COLORS, MASTER_ICONS, MasterField } from "@/lib/store";
+import { useStore, MASTER_COLORS, MASTER_ICONS } from "@/lib/store";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { PlusCircle, Trash2, ChevronRight, Sparkles, Info, FolderOpen } from "lucide-react";
-import TagInput from "@/components/TagInput";
 import { useState, Suspense } from "react";
 import { cn } from "@/lib/utils";
 
 const fieldSchema = yup.object({
-  label: yup.string().required("Field name is required"),
-  type: yup.mixed<"text" | "number" | "select" | "color">().oneOf(["text", "number", "select", "color"]).required(),
-  unit: yup.string().optional(),
-  options: yup.array(yup.string().required()).optional(),
+  label: yup.string().required("Value is required"),
+  type: yup.mixed<"text">().oneOf(["text"]).required(),
 });
 
 const schema = yup.object({
@@ -26,19 +23,11 @@ const schema = yup.object({
   linkedCategoryId: yup.string().default(""),
   fields: yup
     .array(fieldSchema)
-    .min(1, "Add at least one field")
-    .max(7, "Maximum 7 fields allowed")
+    .min(1, "Add at least one value")
     .required(),
 });
 
 type FormData = yup.InferType<typeof schema>;
-
-const FIELD_TYPES = [
-  { value: "text", label: "Text", emoji: "🔤", desc: "Free text (e.g., grade, finish)" },
-  { value: "number", label: "Number", emoji: "🔢", desc: "Numeric value (e.g., 6, 8.5)" },
-  { value: "select", label: "Options", emoji: "📋", desc: "Fixed dropdown choices" },
-  { value: "color", label: "Color", emoji: "🎨", desc: "Color picker value" },
-];
 
 function CreateMasterForm() {
   const { addMasterCategory, masterCategories, categories } = useStore();
@@ -61,7 +50,7 @@ function CreateMasterForm() {
       color: MASTER_COLORS[0],
       icon: MASTER_ICONS[0],
       linkedCategoryId: preselectedCategoryId,
-      fields: [{ label: "", type: "text", unit: "", options: [] }],
+      fields: [{ label: "", type: "text" }],
     },
   });
 
@@ -84,13 +73,11 @@ function CreateMasterForm() {
       fields: data.fields.map((f, i) => ({
         id: `f-${Date.now()}-${i}`,
         label: f.label,
-        type: f.type,
-        unit: f.unit,
-        options: f.options as string[] | undefined,
+        type: "text",
       })),
     });
     toast.success(`Master "${data.name}" created!`, {
-      description: `${data.fields.length} field${data.fields.length > 1 ? "s" : ""} added.`,
+      description: `${data.fields.length} value${data.fields.length > 1 ? "s" : ""} added.`,
     });
     router.push("/masters");
   };
@@ -100,7 +87,7 @@ function CreateMasterForm() {
       <div className="max-w-xl mx-auto text-center py-20">
         <div className="text-5xl mb-4">🔒</div>
         <h2 className="text-xl font-bold text-slate-800 mb-2">Maximum Masters Reached</h2>
-        <p className="text-slate-500 mb-6">You've used all 7 master slots. Delete an existing one to create a new one.</p>
+        <p className="text-slate-500 mb-6">You've used all master slots. Delete an existing one to create a new one.</p>
         <button
           onClick={() => router.push("/masters")}
           className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-colors"
@@ -125,8 +112,7 @@ function CreateMasterForm() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-800">Create Master</h1>
         <p className="text-slate-500 text-sm mt-1">
-          Masters define what attributes your products will have. You have{" "}
-          <span className="font-semibold text-indigo-600">{remaining} slot{remaining !== 1 ? "s" : ""}</span> remaining.
+          Masters define value types for your products (like Size, Color, Material).
         </p>
       </div>
 
@@ -134,8 +120,8 @@ function CreateMasterForm() {
       <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3 items-start">
         <Info className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
         <p className="text-xs text-amber-700 leading-relaxed">
-          A <strong>Master</strong> is a product type (e.g., "Die Springs") with custom fields (e.g., Size, Diameter, Load).
-          Optionally link it to a <strong>Category</strong> to keep things organised.
+          A <strong>Master</strong> represents a value type (e.g., "Size", "Color") with specific values (e.g., 9, 10, 11 or Red, Blue, Green).
+          Link it to a <strong>Category</strong> to keep things organised.
         </p>
       </div>
 
@@ -179,7 +165,7 @@ function CreateMasterForm() {
               </label>
               <input
                 {...register("name")}
-                placeholder="e.g., Die Springs, Ejector Pins, Hex Bolts..."
+                placeholder="e.g., Size, Color, Material, Length..."
                 className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all placeholder:text-slate-400"
               />
               {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name.message}</p>}
@@ -191,7 +177,7 @@ function CreateMasterForm() {
               </label>
               <textarea
                 {...register("description")}
-                placeholder="Brief description of what products fall under this master..."
+                placeholder="Brief description of this value type..."
                 rows={2}
                 className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all placeholder:text-slate-400 resize-none"
               />
@@ -315,21 +301,18 @@ function CreateMasterForm() {
           )}
         </div>
 
-        {/* ── Step 3: Fields ─────────────────────────────────────────────── */}
+        {/* ── Step 3: Add Values ─────────────────────────────────────────────── */}
         <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded-full bg-pink-100 text-pink-600 text-xs font-bold flex items-center justify-center">3</div>
-              <h2 className="text-sm font-semibold text-slate-700">Define Attributes / Fields</h2>
+              <h2 className="text-sm font-semibold text-slate-700">Add Values</h2>
             </div>
-            <span className="text-xs bg-slate-100 text-slate-500 px-2 py-1 rounded-full">
-              {fields.length} / 7
-            </span>
           </div>
 
           <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-            Add attributes like <strong>Size</strong>, <strong>Diameter</strong>, <strong>Material</strong> —
-            these will appear when creating a product under this master.
+            Add possible values for this master — like <strong>9, 10, 11</strong> for sizes or <strong>Red, Blue, Green</strong> for colors.
+            These values will be available when creating products.
           </p>
 
           {errors.fields && !Array.isArray(errors.fields) && (
@@ -342,8 +325,6 @@ function CreateMasterForm() {
                 key={field.id}
                 index={index}
                 register={register}
-                control={control}
-                watch={watch}
                 errors={errors}
                 remove={remove}
                 canRemove={fields.length > 1}
@@ -351,16 +332,14 @@ function CreateMasterForm() {
             ))}
           </div>
 
-          {fields.length < 7 && (
-            <button
-              type="button"
-              onClick={() => append({ label: "", type: "text", unit: "", options: [] })}
-              className="mt-4 w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-indigo-200 rounded-xl text-sm text-indigo-500 font-medium hover:bg-indigo-50 hover:border-indigo-300 transition-all"
-            >
-              <PlusCircle className="w-4 h-4" />
-              Add Field ({7 - fields.length} remaining)
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => append({ label: "", type: "text" })}
+            className="mt-4 w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-indigo-200 rounded-xl text-sm text-indigo-500 font-medium hover:bg-indigo-50 hover:border-indigo-300 transition-all"
+          >
+            <PlusCircle className="w-4 h-4" />
+            Add Value
+          </button>
         </div>
 
         {/* ── Actions ────────────────────────────────────────────────────── */}
@@ -400,41 +379,25 @@ export default function CreateMasterPage() {
 function FieldRow({
   index,
   register,
-  control,
-  watch,
   errors,
   remove,
   canRemove,
 }: any) {
-  const fieldType = watch(`fields.${index}.type`);
-
   return (
     <div className="border border-slate-100 rounded-xl p-4 bg-slate-50/50 space-y-3">
       <div className="flex items-center gap-2">
         <span className="w-5 h-5 rounded-full bg-white border border-slate-200 text-xs font-bold text-slate-400 flex items-center justify-center flex-shrink-0">
           {index + 1}
         </span>
-        <div className="flex-1 grid grid-cols-2 gap-2">
-          <div>
-            <input
-              {...register(`fields.${index}.label`)}
-              placeholder="Field name (e.g., Size)"
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 bg-white transition-all"
-            />
-            {errors.fields?.[index]?.label && (
-              <p className="mt-0.5 text-[10px] text-red-500">{errors.fields[index].label.message}</p>
-            )}
-          </div>
-          <select
-            {...register(`fields.${index}.type`)}
-            className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 bg-white transition-all text-slate-700"
-          >
-            {FIELD_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.emoji} {t.label}
-              </option>
-            ))}
-          </select>
+        <div className="flex-1">
+          <input
+            {...register(`fields.${index}.label`)}
+            placeholder="Value (e.g., 9, Red, Steel)"
+            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 bg-white transition-all"
+          />
+          {errors.fields?.[index]?.label && (
+            <p className="mt-0.5 text-[10px] text-red-500">{errors.fields[index].label.message}</p>
+          )}
         </div>
         {canRemove && (
           <button
@@ -446,34 +409,6 @@ function FieldRow({
           </button>
         )}
       </div>
-
-      {(fieldType === "text" || fieldType === "number") && (
-        <div className="pl-7">
-          <input
-            {...register(`fields.${index}.unit`)}
-            placeholder="Unit (optional, e.g., mm, kg, inches)"
-            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 bg-white transition-all"
-          />
-        </div>
-      )}
-
-      {fieldType === "select" && (
-        <div className="pl-7">
-          <p className="text-xs text-slate-500 mb-1.5 font-medium">Options (users will pick from these)</p>
-          <Controller
-            control={control}
-            name={`fields.${index}.options`}
-            render={({ field }) => (
-              <TagInput
-                value={field.value as string[] ?? []}
-                onChange={field.onChange}
-                placeholder="Type an option and press Enter..."
-                colorful
-              />
-            )}
-          />
-        </div>
-      )}
     </div>
   );
 }
