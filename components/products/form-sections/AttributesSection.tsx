@@ -1,6 +1,7 @@
 import { FormikProps } from "formik";
 import { Info } from "lucide-react";
 import MultiSelect from "@/components/MultiSelect";
+import type { Master } from "@/lib/supabase/types";
 
 type FormData = {
   name: string;
@@ -12,7 +13,7 @@ type FormData = {
 };
 
 interface AttributesSectionProps {
-  category: { id: string; name: string; fields: { id: string; label: string; options?: string[]; unit?: string }[] };
+  category: Master;
   formik: FormikProps<FormData>;
 }
 

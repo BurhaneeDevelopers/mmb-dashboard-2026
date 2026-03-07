@@ -1,19 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { PlusCircle } from "lucide-react";
 import Link from "next/link";
-import { useStore, Product } from "@/lib/store";
+import { useProducts, useMasters, useDeleteProduct } from "@/lib/hooks";
 import { ProductCard } from "./ProductCard";
 import { ProductFilters } from "./ProductFilters";
 import { EmptyState } from "./EmptyState";
 import { NoResults } from "./NoResults";
 
 export function ProductListClient() {
-  const { products, deleteProduct, masterCategories } = useStore();
-  const router = useRouter();
+  const { data: products = [], isLoading } = useProducts();
+  const { data: masterCategories = [] } = useMasters();
+  const deleteProductMutation = useDeleteProduct();
+  
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterCategory, setFilterCategory] = useState<string>("all");
@@ -27,9 +28,15 @@ export function ProductListClient() {
     return matchSearch && matchStatus && matchCat;
   });
 
-  const handleDelete = (id: string, name: string) => {
-    deleteProduct(id);
-    toast.success(`"${name}" deleted`);
+  const handleDelete = async (id: string, name: string) => {
+    try {
+      await deleteProductMutation.mutateAsync(id);
+      toast.success(`"${name}" deleted`);
+    } catch (error) {
+      toast.error(`Failed to delete "${name}"`, {
+        description: error instanceof Error ? error.message : "Please try again",
+      });
+    }
   };
 
   const statCounts = {
@@ -44,6 +51,14 @@ export function ProductListClient() {
     setFilterStatus("all");
     setFilterCategory("all");
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="text-slate-500">Loading products...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-fade-in-up space-y-6">

@@ -1,6 +1,7 @@
 import { FormikProps } from "formik";
 import { CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { Master } from "@/lib/supabase/types";
 
 type FormData = {
   name: string;
@@ -13,7 +14,7 @@ type FormData = {
 
 interface CategorySectionProps {
   selectedCategoryId: string;
-  categories: Array<{ id: string; name: string; icon: string; color: string; description: string; fields: { id: string; label: string }[] }>;
+  categories: Master[];
   formik: FormikProps<FormData>;
 }
 

@@ -258,23 +258,48 @@ CREATE POLICY "Authenticated users can delete products"
 -- =====================================================
 
 -- Insert sample categories
-INSERT INTO categories (id, name, description, color, icon) VALUES
-    ('cat-1', 'Die Springs', 'Compression springs used in die sets and molds', '#6366f1', '🔗'),
-    ('cat-2', 'Ejector Pins', 'Pins used to eject parts from molds', '#ec4899', '📌');
+INSERT INTO categories (name, description, color, icon) VALUES
+    ('Die Springs', 'Compression springs used in die sets and molds', '#6366f1', '🔗'),
+    ('Ejector Pins', 'Pins used to eject parts from molds', '#ec4899', '📌');
 
--- Insert sample masters
-INSERT INTO masters (id, name, description, color, icon, category_id) VALUES
-    ('master-1', 'Size', 'Product size specification', '#6366f1', '📐', 'cat-1'),
-    ('master-2', 'Load', 'Load capacity specification', '#f59e0b', '⚡', 'cat-1'),
-    ('master-3', 'Length', 'Product length measurement', '#ec4899', '📏', 'cat-2'),
-    ('master-4', 'Material', 'Material composition', '#10b981', '🔧', 'cat-2');
-
--- Insert sample master fields
-INSERT INTO master_fields (master_id, label, type, options, unit, sort_order) VALUES
-    ('master-1', 'Size', 'select', '["M6", "M8", "M10", "M12", "M16"]'::jsonb, NULL, 0),
-    ('master-2', 'Load', 'select', '["Light", "Medium", "Heavy", "Extra Heavy"]'::jsonb, NULL, 0),
-    ('master-3', 'Length', 'select', '["50mm", "75mm", "100mm", "150mm", "200mm"]'::jsonb, 'mm', 0),
-    ('master-4', 'Material', 'select', '["SKD61", "SKH51", "Nitrided Steel", "Stainless Steel"]'::jsonb, NULL, 0);
+-- Get the category IDs for reference
+DO $$
+DECLARE
+    cat_die_springs_id UUID;
+    cat_ejector_pins_id UUID;
+    master_size_id UUID;
+    master_load_id UUID;
+    master_length_id UUID;
+    master_material_id UUID;
+BEGIN
+    -- Get category IDs
+    SELECT id INTO cat_die_springs_id FROM categories WHERE name = 'Die Springs';
+    SELECT id INTO cat_ejector_pins_id FROM categories WHERE name = 'Ejector Pins';
+    
+    -- Insert sample masters
+    INSERT INTO masters (name, description, color, icon, category_id) VALUES
+        ('Size', 'Product size specification', '#6366f1', '📐', cat_die_springs_id)
+        RETURNING id INTO master_size_id;
+    
+    INSERT INTO masters (name, description, color, icon, category_id) VALUES
+        ('Load', 'Load capacity specification', '#f59e0b', '⚡', cat_die_springs_id)
+        RETURNING id INTO master_load_id;
+    
+    INSERT INTO masters (name, description, color, icon, category_id) VALUES
+        ('Length', 'Product length measurement', '#ec4899', '📏', cat_ejector_pins_id)
+        RETURNING id INTO master_length_id;
+    
+    INSERT INTO masters (name, description, color, icon, category_id) VALUES
+        ('Material', 'Material composition', '#10b981', '🔧', cat_ejector_pins_id)
+        RETURNING id INTO master_material_id;
+    
+    -- Insert sample master fields
+    INSERT INTO master_fields (master_id, label, type, options, unit, sort_order) VALUES
+        (master_size_id, 'Size', 'select', '["M6", "M8", "M10", "M12", "M16"]'::jsonb, NULL, 0),
+        (master_load_id, 'Load', 'select', '["Light", "Medium", "Heavy", "Extra Heavy"]'::jsonb, NULL, 0),
+        (master_length_id, 'Length', 'select', '["50mm", "75mm", "100mm", "150mm", "200mm"]'::jsonb, 'mm', 0),
+        (master_material_id, 'Material', 'select', '["SKD61", "SKH51", "Nitrided Steel", "Stainless Steel"]'::jsonb, NULL, 0);
+END $$;
 
 -- =====================================================
 -- HELPER FUNCTIONS

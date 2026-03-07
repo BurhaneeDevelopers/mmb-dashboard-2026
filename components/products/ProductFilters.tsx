@@ -2,6 +2,7 @@
 
 import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { Master } from "@/lib/supabase/types";
 
 const STATUS_CONFIG = {
   active: { label: "Active", dot: "bg-emerald-500" },
@@ -16,7 +17,7 @@ interface ProductFiltersProps {
   onStatusChange: (value: string) => void;
   filterCategory: string;
   onCategoryChange: (value: string) => void;
-  categories: Array<{ id: string; name: string; icon: string }>;
+  categories: Master[];
   statCounts: {
     all: number;
     active: number;

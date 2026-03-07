@@ -5,7 +5,7 @@ import * as Yup from "yup";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ChevronRight, Sparkles, AlertCircle, ArrowRight } from "lucide-react";
-import { useStore } from "@/lib/store";
+import { useMasters, useCreateProduct, useUpdateProduct } from "@/lib/hooks";
 import { BasicInfoSection } from "./form-sections/BasicInfoSection";
 import { AttributesSection } from "./form-sections/AttributesSection";
 import { CategorySection } from "./form-sections/CategorySection";
@@ -42,8 +42,10 @@ const validationSchema = Yup.object({
 });
 
 export function ProductForm({ mode, initialData, productId }: ProductFormProps) {
-  const { masterCategories, addProduct, updateProduct } = useStore();
   const router = useRouter();
+  const { data: masterCategories = [], isLoading: mastersLoading } = useMasters();
+  const createProduct = useCreateProduct();
+  const updateProduct = useUpdateProduct();
 
   const formik = useFormik<FormData>({
     initialValues: initialData ?? {
@@ -55,19 +57,51 @@ export function ProductForm({ mode, initialData, productId }: ProductFormProps) 
       masterValues: {},
     },
     validationSchema,
-    onSubmit: (values: FormData) => {
-      if (mode === "edit" && productId) {
-        updateProduct(productId, values);
-        toast.success(`Product "${values.name}" updated!`);
-      } else {
-        addProduct(values);
-        toast.success(`Product "${values.name}" created!`);
+    onSubmit: async (values: FormData) => {
+      try {
+        if (mode === "edit" && productId) {
+          await updateProduct.mutateAsync({
+            id: productId,
+            input: {
+              name: values.name,
+              sku: values.sku,
+              categoryId: values.categoryId,
+              description: values.description || undefined,
+              status: values.status,
+              masterValues: values.masterValues,
+            },
+          });
+          toast.success(`Product "${values.name}" updated!`);
+        } else {
+          await createProduct.mutateAsync({
+            name: values.name,
+            sku: values.sku,
+            categoryId: values.categoryId,
+            description: values.description || undefined,
+            status: values.status,
+            masterValues: values.masterValues,
+          });
+          toast.success(`Product "${values.name}" created!`);
+        }
+        router.push("/products");
+      } catch (error) {
+        toast.error(mode === "edit" ? "Failed to update product" : "Failed to create product", {
+          description: error instanceof Error ? error.message : "Please try again",
+        });
       }
-      router.push("/products");
     },
   });
 
   const selectedCategory = masterCategories.find((c) => c.id === formik.values.categoryId);
+
+  if (mastersLoading) {
+    return (
+      <div className="max-w-2xl mx-auto py-20 text-center">
+        <div className="inline-block w-8 h-8 border-4 border-pink-200 border-t-pink-600 rounded-full animate-spin" />
+        <p className="text-sm text-slate-500 mt-4">Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto animate-fade-in-up">
@@ -131,7 +165,7 @@ export function ProductForm({ mode, initialData, productId }: ProductFormProps) 
           </button>
           <button
             type="submit"
-            disabled={formik.isSubmitting || masterCategories.length === 0}
+            disabled={formik.isSubmitting || masterCategories.length === 0 || createProduct.isPending || updateProduct.isPending}
             className="flex-1 py-3 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all disabled:opacity-60"
             style={{ background: "linear-gradient(135deg, #ec4899, #f43f5e)" }}
           >

@@ -1,4 +1,4 @@
-import { Product } from "@/lib/store";
+import type { Product, Master } from "@/lib/supabase/types";
 import { Trash2, Edit } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -11,7 +11,7 @@ const STATUS_CONFIG = {
 
 interface ProductCardProps {
   product: Product;
-  category?: { id: string; name: string; icon: string; color: string; fields: { id: string; label: string }[] };
+  category?: Master;
   onDelete: (id: string, name: string) => void;
 }
 
