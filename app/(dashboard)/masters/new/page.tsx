@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 
 const fieldSchema = yup.object({
   label: yup.string().required("Value is required"),
-  type: yup.mixed<"text">().oneOf(["text"]).required(),
+  type: yup.mixed<"select">().oneOf(["select"]).required(),
 });
 
 const schema = yup.object({
@@ -50,7 +50,7 @@ function CreateMasterForm() {
       color: MASTER_COLORS[0],
       icon: MASTER_ICONS[0],
       linkedCategoryId: preselectedCategoryId,
-      fields: [{ label: "", type: "text" }],
+      fields: [{ label: "", type: "select" }],
     },
   });
 
@@ -73,7 +73,8 @@ function CreateMasterForm() {
       fields: data.fields.map((f, i) => ({
         id: `f-${Date.now()}-${i}`,
         label: f.label,
-        type: "text",
+        type: "select",
+        options: [],
       })),
     });
     toast.success(`Master "${data.name}" created!`, {
@@ -334,7 +335,7 @@ function CreateMasterForm() {
 
           <button
             type="button"
-            onClick={() => append({ label: "", type: "text" })}
+            onClick={() => append({ label: "", type: "select" })}
             className="mt-4 w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-indigo-200 rounded-xl text-sm text-indigo-500 font-medium hover:bg-indigo-50 hover:border-indigo-300 transition-all"
           >
             <PlusCircle className="w-4 h-4" />

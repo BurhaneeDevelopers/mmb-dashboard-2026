@@ -16,8 +16,8 @@ export interface Category {
 export interface MasterField {
   id: string;
   label: string;
-  type: "text" | "number" | "select" | "color";
-  options?: string[];
+  type: "select";
+  options: string[];
   unit?: string;
 }
 
@@ -107,10 +107,10 @@ const SEED_MASTERS: MasterCategory[] = [
     icon: "⚙️",
     categoryId: "grp-1",
     fields: [
-      { id: "f1", label: "Size", type: "text" },
-      { id: "f2", label: "Diameter", type: "number", unit: "mm" },
+      { id: "f1", label: "Size", type: "select", options: ["M6", "M8", "M10", "M12", "M16"] },
+      { id: "f2", label: "Diameter", type: "select", options: ["6mm", "8mm", "10mm", "12mm", "16mm"], unit: "mm" },
       { id: "f3", label: "Load", type: "select", options: ["Light", "Medium", "Heavy", "Extra Heavy"] },
-      { id: "f4", label: "Color", type: "color" },
+      { id: "f4", label: "Color", type: "select", options: ["Red", "Blue", "Green", "Yellow", "Brown"] },
     ],
     createdAt: new Date().toISOString(),
   },
@@ -122,8 +122,8 @@ const SEED_MASTERS: MasterCategory[] = [
     icon: "🔩",
     categoryId: "grp-2",
     fields: [
-      { id: "f5", label: "Length", type: "number", unit: "mm" },
-      { id: "f6", label: "Diameter", type: "number", unit: "mm" },
+      { id: "f5", label: "Length", type: "select", options: ["50mm", "75mm", "100mm", "150mm", "200mm"], unit: "mm" },
+      { id: "f6", label: "Diameter", type: "select", options: ["3mm", "4mm", "5mm", "6mm", "8mm"], unit: "mm" },
       { id: "f7", label: "Material", type: "select", options: ["SKD61", "SKH51", "Nitrided Steel", "Stainless Steel"] },
       { id: "f8", label: "Surface Finish", type: "select", options: ["Polished", "Ground", "Nitrided"] },
     ],

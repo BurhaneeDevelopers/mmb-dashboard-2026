@@ -292,9 +292,7 @@ function CreateProductForm() {
               {selectedCategory.fields.map((field) => (
                 <div key={field.id}>
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-sm">
-                      {field.type === "text" ? "🔤" : field.type === "number" ? "🔢" : field.type === "color" ? "🎨" : "📋"}
-                    </span>
+                    <span className="text-sm">📋</span>
                     <label className="text-sm font-medium text-slate-700">{field.label}</label>
                     {field.unit && (
                       <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-medium">
@@ -310,26 +308,15 @@ function CreateProductForm() {
                     defaultValue={[]}
                     render={({ field: formField }) => {
                       const val = (formField.value as string[]) ?? [];
-                      if (field.type === "select" && field.options?.length) {
-                        return (
-                          <MultiSelect
-                            options={field.options ?? []}
-                            value={val}
-                            onChange={formField.onChange}
-                            placeholder={`Choose ${field.label.toLowerCase()} value(s)...`}
-                          />
-                        );
-                      }
                       return (
-                        <TagInput
+                        <MultiSelect
+                          options={field.options ?? []}
                           value={val}
                           onChange={formField.onChange}
-                          placeholder={
-                            field.type === "number"
-                              ? `Type a number${field.unit ? ` in ${field.unit}` : ""} and press Enter...`
-                              : `Type a value and press Enter to add...`
-                          }
-                          colorful
+                          placeholder={`Choose ${field.label.toLowerCase()} value(s)...`}
+                          fieldId={field.id}
+                          masterId={selectedCategoryId}
+                          enableQuickCreate={true}
                         />
                       );
                     }}
