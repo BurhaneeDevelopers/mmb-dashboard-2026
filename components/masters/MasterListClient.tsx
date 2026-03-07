@@ -1,21 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { PlusCircle } from "lucide-react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { MasterCard } from "./MasterCard";
 import { MasterFilters } from "./MasterFilters";
-import { SlotBar } from "./SlotBar";
 import { EmptyState } from "./EmptyState";
 import { NoResults } from "./NoResults";
-import { AddMasterSlot } from "./AddMasterSlot";
 
 export function MasterListClient() {
   const { masterCategories, deleteMasterCategory, products, categories } = useStore();
-  const router = useRouter();
   const [search, setSearch] = useState("");
   const [filterCategoryId, setFilterCategoryId] = useState("all");
 
@@ -44,36 +40,25 @@ export function MasterListClient() {
     setFilterCategoryId("all");
   };
 
-  const remaining = 7 - masterCategories.length;
-
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Master Categories</h1>
+          <h1 className="text-2xl font-bold text-slate-800">Master Attributes</h1>
           <p className="text-slate-500 text-sm mt-1">
-            {masterCategories.length} of 7 slots used · These define what attributes products can have
+            {masterCategories.length} {masterCategories.length === 1 ? "master" : "masters"} · Define attributes like Size, Length, Material, Color
           </p>
         </div>
-        {remaining > 0 && (
-          <Link
-            href="/masters/new"
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md hover:shadow-lg transition-all"
-            style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}
-          >
-            <PlusCircle className="w-4 h-4" />
-            New Master
-          </Link>
-        )}
+        <Link
+          href="/masters/new"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md hover:shadow-lg transition-all"
+          style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}
+        >
+          <PlusCircle className="w-4 h-4" />
+          New Master
+        </Link>
       </div>
-
-      {/* Slot bar */}
-      <SlotBar
-        used={masterCategories.length}
-        total={7}
-        colors={masterCategories.map((m) => m.color)}
-      />
 
       {/* Search & filter */}
       {masterCategories.length > 0 && (
@@ -107,9 +92,6 @@ export function MasterListClient() {
               />
             );
           })}
-
-          {/* Add new slot */}
-          {remaining > 0 && <AddMasterSlot remaining={remaining} />}
         </div>
       )}
     </div>

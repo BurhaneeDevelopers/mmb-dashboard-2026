@@ -96,7 +96,7 @@ export default function Sidebar() {
                     >
                       <item.icon
                         className={cn(
-                          "w-4 h-4 flex-shrink-0",
+                          "w-4 h-4 shrink-0",
                           active ? "text-indigo-500" : "text-slate-400"
                         )}
                       />
@@ -138,25 +138,30 @@ export default function Sidebar() {
         <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-3">
           <div className="flex justify-between text-xs text-slate-500 mb-1.5">
             <span className="font-medium text-slate-600">Masters</span>
-            <span className="font-bold text-indigo-600">{masterCategories.length} / 7</span>
+            <span className="font-bold text-indigo-600">{masterCategories.length}</span>
           </div>
-          <div className="flex gap-1">
-            {Array.from({ length: 7 }).map((_, i) => (
-              <div
-                key={i}
-                className="flex-1 h-1.5 rounded-full transition-all duration-500"
-                style={{
-                  background:
-                    i < masterCategories.length
-                      ? masterCategories[i]?.color || "#6366f1"
-                      : "#e2e8f0",
-                }}
-              />
+          <div className="flex gap-1 flex-wrap">
+            {masterCategories.slice(0, 8).map((m) => (
+              <span
+                key={m.id}
+                className="text-xs px-2 py-0.5 rounded-full text-white font-medium leading-none"
+                style={{ background: m.color }}
+              >
+                {m.icon}
+              </span>
             ))}
+            {masterCategories.length === 0 && (
+              <span className="text-[11px] text-slate-400">None yet</span>
+            )}
           </div>
-          <p className="mt-1.5 text-[11px] text-slate-400">
-            {7 - masterCategories.length} slot{7 - masterCategories.length !== 1 ? "s" : ""} remaining
-          </p>
+        </div>
+
+        {/* Products count */}
+        <div className="bg-gradient-to-br from-pink-50 to-rose-50 rounded-xl p-3">
+          <div className="flex justify-between items-center">
+            <span className="text-xs font-medium text-slate-600">Products</span>
+            <span className="font-bold text-pink-600 text-lg">{products.length}</span>
+          </div>
         </div>
       </div>
     </aside>

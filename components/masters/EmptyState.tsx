@@ -7,7 +7,7 @@ export function EmptyState() {
       <div className="text-5xl mb-4">🏗️</div>
       <h3 className="text-lg font-bold text-slate-800 mb-2">No Masters Yet</h3>
       <p className="text-slate-500 text-sm mb-6 max-w-sm mx-auto leading-relaxed">
-        Masters define the attributes your products will have. Start by creating your first master like &quot;Die Springs&quot; or &quot;Ejector Pins&quot;.
+        Masters define attributes like &quot;Size&quot;, &quot;Length&quot;, &quot;Material&quot;, or &quot;Color&quot; that can be used across different product categories.
       </p>
       <Link
         href="/masters/new"

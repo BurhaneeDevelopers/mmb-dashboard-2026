@@ -51,10 +51,8 @@ const validationSchema = Yup.object({
 });
 
 export function MasterForm({ mode, initialData, masterId }: MasterFormProps) {
-  const { addMasterCategory, updateMasterCategory, masterCategories, categories } = useStore();
+  const { addMasterCategory, updateMasterCategory, categories } = useStore();
   const router = useRouter();
-
-  const remaining = 7 - masterCategories.length;
 
   const formik = useFormik<FormData>({
     initialValues: initialData ?? {
@@ -104,22 +102,6 @@ export function MasterForm({ mode, initialData, masterId }: MasterFormProps) {
     },
   });
 
-  if (mode === "create" && remaining <= 0) {
-    return (
-      <div className="max-w-xl mx-auto text-center py-20">
-        <div className="text-5xl mb-4">🔒</div>
-        <h2 className="text-xl font-bold text-slate-800 mb-2">Maximum Masters Reached</h2>
-        <p className="text-slate-500 mb-6">You&apos;ve used all master slots. Delete an existing one to create a new one.</p>
-        <button
-          onClick={() => router.push("/masters")}
-          className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-colors"
-        >
-          Manage Masters
-        </button>
-      </div>
-    );
-  }
-
   const linkedCategory = categories.find((c) => c.id === formik.values.linkedCategoryId);
 
   return (
@@ -140,7 +122,7 @@ export function MasterForm({ mode, initialData, masterId }: MasterFormProps) {
             {mode === "edit" ? "Edit Master" : "Create Master"}
           </h1>
           <p className="text-slate-500 text-sm mt-1">
-            Masters define value types for your products (like Size, Color, Material).
+            Masters define attribute types for your products (like Size, Color, Material).
           </p>
         </div>
 

@@ -24,8 +24,8 @@ export function IdentitySection({ formik, linkedCategory }: IdentitySectionProps
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3 items-start">
         <Info className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
         <p className="text-xs text-amber-700 leading-relaxed">
-          A <strong>Master</strong> represents a value type (e.g., &quot;Size&quot;, &quot;Color&quot;) with specific values (e.g., 9, 10, 11 or Red, Blue, Green).
-          Link it to a <strong>Category</strong> to keep things organised.
+          A <strong>Master</strong> represents an attribute type (e.g., &quot;Size&quot;, &quot;Length&quot;, &quot;Material&quot;) with specific values (e.g., M6, M8, M10 or Red, Blue, Green).
+          Link it to <strong>Categories</strong> to make it available for products in those categories.
         </p>
       </div>
 
