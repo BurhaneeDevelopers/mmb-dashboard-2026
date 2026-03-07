@@ -5,7 +5,8 @@ import * as Yup from "yup";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ChevronRight, Sparkles, Info, FolderPlus } from "lucide-react";
-import { useStore, CATEGORY_COLORS, CATEGORY_ICONS } from "@/lib/store";
+import { useCategories, useCreateCategory, useUpdateCategory } from "@/lib/hooks";
+import { CATEGORY_COLORS, CATEGORY_ICONS } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 type FormData = {
@@ -35,7 +36,9 @@ const validationSchema = Yup.object({
 });
 
 export function CategoryForm({ mode, initialData, categoryId }: CategoryFormProps) {
-  const { addCategory, updateCategory, categories } = useStore();
+  const { data: categories = [] } = useCategories();
+  const createMutation = useCreateCategory();
+  const updateMutation = useUpdateCategory();
   const router = useRouter();
 
   const formik = useFormik<FormData>({
@@ -46,17 +49,24 @@ export function CategoryForm({ mode, initialData, categoryId }: CategoryFormProp
       icon: CATEGORY_ICONS[0],
     },
     validationSchema,
-    onSubmit: (values: FormData) => {
-      if (mode === "edit" && categoryId) {
-        updateCategory(categoryId, values);
-        toast.success(`Category "${values.name}" updated!`);
-      } else {
-        addCategory(values);
-        toast.success(`Category "${values.name}" created!`, {
-          description: "You can now link masters to this category.",
+    onSubmit: async (values: FormData) => {
+      try {
+        if (mode === "edit" && categoryId) {
+          await updateMutation.mutateAsync({ id: categoryId, input: values });
+          toast.success(`Category "${values.name}" updated!`);
+        } else {
+          await createMutation.mutateAsync(values);
+          toast.success(`Category "${values.name}" created!`, {
+            description: "You can now link masters to this category.",
+          });
+        }
+        router.push("/categories");
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+        toast.error(mode === "edit" ? "Failed to update category" : "Failed to create category", {
+          description: errorMessage,
         });
       }
-      router.push("/categories");
     },
   });
 

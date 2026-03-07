@@ -4,7 +4,9 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { PlusCircle } from "lucide-react";
 import Link from "next/link";
-import { useStore, Category } from "@/lib/store";
+import { useCategories, useUpdateCategory, useDeleteCategory } from "@/lib/hooks";
+import { useMasters } from "@/lib/hooks";
+import type { Category } from "@/lib/supabase/types";
 import { CategoryCard } from "./CategoryCard";
 import { CategoryEditCard } from "./CategoryEditCard";
 import { CategorySearch } from "./CategorySearch";
@@ -14,7 +16,11 @@ import { NoResults } from "./NoResults";
 import { AddCategorySlot } from "./AddCategorySlot";
 
 export function CategoryListClient() {
-  const { categories, masterCategories, deleteCategory, updateCategory } = useStore();
+  const { data: categories = [], isLoading } = useCategories();
+  const { data: masterCategories = [] } = useMasters();
+  const updateMutation = useUpdateCategory();
+  const deleteMutation = useDeleteCategory();
+  
   const [search, setSearch] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -24,22 +30,40 @@ export function CategoryListClient() {
       c.description.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleDelete = (cat: Category) => {
-    const err = deleteCategory(cat.id);
-    if (err) {
-      toast.error(`Cannot delete "${cat.name}"`, { description: err });
-    } else {
+  const handleDelete = async (cat: Category) => {
+    try {
+      await deleteMutation.mutateAsync(cat.id);
       toast.success(`"${cat.name}" deleted`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete category';
+      toast.error(`Cannot delete "${cat.name}"`, { 
+        description: errorMessage 
+      });
     }
   };
 
-  const handleUpdate = (id: string, data: Partial<Category>) => {
-    updateCategory(id, data);
-    toast.success("Category updated");
-    setEditingId(null);
+  const handleUpdate = async (id: string, data: Partial<Category>) => {
+    try {
+      await updateMutation.mutateAsync({ id, input: data });
+      toast.success("Category updated");
+      setEditingId(null);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update category';
+      toast.error("Failed to update category", {
+        description: errorMessage
+      });
+    }
   };
 
   const linkedMastersCount = masterCategories.filter((m) => m.categoryId).length;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="text-slate-500">Loading categories...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

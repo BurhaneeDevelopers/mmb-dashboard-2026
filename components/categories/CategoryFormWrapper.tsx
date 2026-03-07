@@ -1,6 +1,6 @@
 "use client";
 
-import { useStore } from "@/lib/store";
+import { useCategory } from "@/lib/hooks";
 import { CategoryForm } from "./CategoryForm";
 
 interface CategoryFormWrapperProps {
@@ -9,10 +9,16 @@ interface CategoryFormWrapperProps {
 }
 
 export function CategoryFormWrapper({ mode, categoryId }: CategoryFormWrapperProps) {
-  const { categories } = useStore();
+  const { data: category, isLoading } = useCategory(categoryId || "");
 
   if (mode === "edit" && categoryId) {
-    const category = categories.find((c) => c.id === categoryId);
+    if (isLoading) {
+      return (
+        <div className="flex items-center justify-center py-20">
+          <div className="text-slate-500">Loading category...</div>
+        </div>
+      );
+    }
     
     if (!category) {
       return (
