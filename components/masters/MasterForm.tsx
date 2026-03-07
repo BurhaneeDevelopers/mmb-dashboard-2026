@@ -5,7 +5,8 @@ import * as Yup from "yup";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ChevronRight, Sparkles } from "lucide-react";
-import { useStore, MASTER_COLORS, MASTER_ICONS } from "@/lib/store";
+import { MASTER_COLORS, MASTER_ICONS } from "@/lib/store";
+import { useCategories, useCreateMaster, useUpdateMaster } from "@/lib/hooks";
 import { IdentitySection } from "./form-sections/IdentitySection";
 import { CategoryLinkSection } from "./form-sections/CategoryLinkSection";
 import { ValuesSection } from "./form-sections/ValuesSection";
@@ -51,8 +52,10 @@ const validationSchema = Yup.object({
 });
 
 export function MasterForm({ mode, initialData, masterId }: MasterFormProps) {
-  const { addMasterCategory, updateMasterCategory, categories } = useStore();
   const router = useRouter();
+  const { data: categories = [], isLoading: categoriesLoading } = useCategories();
+  const createMaster = useCreateMaster();
+  const updateMaster = useUpdateMaster();
 
   const formik = useFormik<FormData>({
     initialValues: initialData ?? {
@@ -64,45 +67,61 @@ export function MasterForm({ mode, initialData, masterId }: MasterFormProps) {
       fields: [{ label: "", type: "select" }],
     },
     validationSchema,
-    onSubmit: (values: FormData) => {
-      if (mode === "edit" && masterId) {
-        updateMasterCategory(masterId, {
-          name: values.name,
-          description: values.description,
-          color: values.color,
-          icon: values.icon,
-          categoryId: values.linkedCategoryId || undefined,
-          fields: values.fields.map((f, i) => ({
-            id: `f-${Date.now()}-${i}`,
-            label: f.label,
-            type: "select",
-            options: [],
-          })),
-        });
-        toast.success(`Master "${values.name}" updated!`);
-      } else {
-        addMasterCategory({
-          name: values.name,
-          description: values.description,
-          color: values.color,
-          icon: values.icon,
-          categoryId: values.linkedCategoryId || undefined,
-          fields: values.fields.map((f, i) => ({
-            id: `f-${Date.now()}-${i}`,
-            label: f.label,
-            type: "select",
-            options: [],
-          })),
-        });
-        toast.success(`Master "${values.name}" created!`, {
-          description: `${values.fields.length} value${values.fields.length > 1 ? "s" : ""} added.`,
+    onSubmit: async (values: FormData) => {
+      try {
+        if (mode === "edit" && masterId) {
+          await updateMaster.mutateAsync({
+            id: masterId,
+            input: {
+              name: values.name,
+              description: values.description,
+              color: values.color,
+              icon: values.icon,
+              categoryId: values.linkedCategoryId || undefined,
+              fields: values.fields.map((f) => ({
+                label: f.label,
+                type: "select" as const,
+                options: [],
+              })),
+            },
+          });
+          toast.success(`Master "${values.name}" updated!`);
+        } else {
+          await createMaster.mutateAsync({
+            name: values.name,
+            description: values.description,
+            color: values.color,
+            icon: values.icon,
+            categoryId: values.linkedCategoryId || undefined,
+            fields: values.fields.map((f) => ({
+              label: f.label,
+              type: "select" as const,
+              options: [],
+            })),
+          });
+          toast.success(`Master "${values.name}" created!`, {
+            description: `${values.fields.length} value${values.fields.length > 1 ? "s" : ""} added.`,
+          });
+        }
+        router.push("/masters");
+      } catch (error) {
+        toast.error(mode === "edit" ? "Failed to update master" : "Failed to create master", {
+          description: error instanceof Error ? error.message : "Please try again",
         });
       }
-      router.push("/masters");
     },
   });
 
   const linkedCategory = categories.find((c) => c.id === formik.values.linkedCategoryId);
+
+  if (categoriesLoading) {
+    return (
+      <div className="max-w-2xl mx-auto py-20 text-center">
+        <div className="inline-block w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+        <p className="text-sm text-slate-500 mt-4">Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <FormikProvider value={formik}>
@@ -143,7 +162,7 @@ export function MasterForm({ mode, initialData, masterId }: MasterFormProps) {
             </button>
             <button
               type="submit"
-              disabled={formik.isSubmitting}
+              disabled={formik.isSubmitting || createMaster.isPending || updateMaster.isPending}
               className="flex-1 py-3 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all disabled:opacity-60"
               style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}
             >

@@ -2,6 +2,7 @@ import { FormikProps } from "formik";
 import { cn } from "@/lib/utils";
 import { MASTER_COLORS, MASTER_ICONS } from "@/lib/store";
 import { Info } from "lucide-react";
+import type { Category } from "@/lib/supabase/types";
 
 type FormData = {
   name: string;
@@ -14,7 +15,7 @@ type FormData = {
 
 interface IdentitySectionProps {
   formik: FormikProps<FormData>;
-  linkedCategory?: { id: string; name: string; icon: string; color: string };
+  linkedCategory?: Category;
 }
 
 export function IdentitySection({ formik, linkedCategory }: IdentitySectionProps) {

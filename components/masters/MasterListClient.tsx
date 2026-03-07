@@ -4,18 +4,23 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { PlusCircle } from "lucide-react";
 import Link from "next/link";
-import { useStore } from "@/lib/store";
+import { useMasters, useDeleteMaster } from "@/lib/hooks";
+import { useProducts, useCategories } from "@/lib/hooks";
 import { MasterCard } from "./MasterCard";
 import { MasterFilters } from "./MasterFilters";
 import { EmptyState } from "./EmptyState";
 import { NoResults } from "./NoResults";
 
 export function MasterListClient() {
-  const { masterCategories, deleteMasterCategory, products, categories } = useStore();
+  const { data: masterCategories = [], isLoading } = useMasters();
+  const { data: products = [] } = useProducts();
+  const { data: categories = [] } = useCategories();
+  const deleteMutation = useDeleteMaster();
+  
   const [search, setSearch] = useState("");
   const [filterCategoryId, setFilterCategoryId] = useState("all");
 
-  const handleDelete = (id: string, name: string) => {
+  const handleDelete = async (id: string, name: string) => {
     const linked = products.filter((p) => p.categoryId === id).length;
     if (linked > 0) {
       toast.error(`Cannot delete "${name}"`, {
@@ -23,8 +28,16 @@ export function MasterListClient() {
       });
       return;
     }
-    deleteMasterCategory(id);
-    toast.success(`"${name}" deleted`);
+    
+    try {
+      await deleteMutation.mutateAsync(id);
+      toast.success(`"${name}" deleted`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete master';
+      toast.error(`Cannot delete "${name}"`, {
+        description: errorMessage,
+      });
+    }
   };
 
   const filtered = masterCategories.filter((m) => {
@@ -39,6 +52,14 @@ export function MasterListClient() {
     setSearch("");
     setFilterCategoryId("all");
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="text-slate-500">Loading masters...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

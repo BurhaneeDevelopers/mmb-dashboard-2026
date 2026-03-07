@@ -2,6 +2,7 @@ import { FormikProps } from "formik";
 import { cn } from "@/lib/utils";
 import { FolderOpen } from "lucide-react";
 import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
+import type { Category } from "@/lib/supabase/types";
 
 type FormData = {
   name: string;
@@ -14,7 +15,7 @@ type FormData = {
 
 interface CategoryLinkSectionProps {
   formik: FormikProps<FormData>;
-  categories: Array<{ id: string; name: string; icon: string; color: string; description: string }>;
+  categories: Category[];
   router: AppRouterInstance;
 }
 

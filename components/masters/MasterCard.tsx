@@ -1,4 +1,4 @@
-import { MasterCategory } from "@/lib/store";
+import type { Master, Category } from "@/lib/supabase/types";
 import { Trash2, Edit, Package, ArrowRight, FolderOpen } from "lucide-react";
 import Link from "next/link";
 
@@ -10,8 +10,8 @@ const FIELD_TYPE_LABELS: Record<string, string> = {
 };
 
 interface MasterCardProps {
-  master: MasterCategory;
-  linkedCategory?: { id: string; name: string; icon: string; color: string };
+  master: Master;
+  linkedCategory?: Category;
   productCount: number;
   onDelete: (id: string, name: string) => void;
 }

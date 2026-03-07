@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useStore } from "@/lib/store";
+import { useMaster } from "@/lib/hooks";
 import { MasterForm } from "./MasterForm";
 
 interface MasterFormWrapperProps {
@@ -11,14 +11,21 @@ interface MasterFormWrapperProps {
 
 export function MasterFormWrapper({ mode, masterId }: MasterFormWrapperProps) {
   const searchParams = useSearchParams();
-  const { masterCategories } = useStore();
-  
   const preselectedCategoryId = searchParams.get("categoryId") ?? "";
 
+  const { data: master, isLoading, error } = useMaster(masterId || "");
+
   if (mode === "edit" && masterId) {
-    const master = masterCategories.find((m) => m.id === masterId);
-    
-    if (!master) {
+    if (isLoading) {
+      return (
+        <div className="max-w-2xl mx-auto py-20 text-center">
+          <div className="inline-block w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+          <p className="text-sm text-slate-500 mt-4">Loading master...</p>
+        </div>
+      );
+    }
+
+    if (error || !master) {
       return (
         <div className="text-center py-20">
           <p className="text-slate-500">Master not found</p>

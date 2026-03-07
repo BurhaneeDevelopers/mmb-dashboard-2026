@@ -1,13 +1,14 @@
 "use client";
 
 import { Search, X } from "lucide-react";
+import type { Category } from "@/lib/supabase/types";
 
 interface MasterFiltersProps {
   search: string;
   onSearchChange: (value: string) => void;
   filterCategoryId: string;
   onCategoryChange: (value: string) => void;
-  categories: Array<{ id: string; name: string; icon: string }>;
+  categories: Category[];
 }
 
 export function MasterFilters({
