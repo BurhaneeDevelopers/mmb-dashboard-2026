@@ -83,10 +83,6 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-* {
-  border-color: rgb(var(--border));
-}
-
 body {
   background-color: rgb(var(--background));
   color: rgb(var(--foreground));
@@ -168,9 +164,6 @@ body {
 }
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
   body {
     @apply bg-background text-foreground;
   }
