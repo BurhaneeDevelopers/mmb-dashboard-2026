@@ -5,7 +5,6 @@ import Link from "next/link";
 
 const STATUS_CONFIG = {
   active: { label: "Active", bg: "bg-emerald-100", text: "text-emerald-700", dot: "bg-emerald-500" },
-  draft: { label: "Draft", bg: "bg-amber-100", text: "text-amber-700", dot: "bg-amber-500" },
   inactive: { label: "Inactive", bg: "bg-red-100", text: "text-red-600", dot: "bg-red-400" },
 };
 

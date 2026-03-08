@@ -6,7 +6,6 @@ import type { Master } from "@/lib/supabase/types";
 
 const STATUS_CONFIG = {
   active: { label: "Active", dot: "bg-emerald-500" },
-  draft: { label: "Draft", dot: "bg-amber-500" },
   inactive: { label: "Inactive", dot: "bg-red-400" },
 };
 
@@ -21,7 +20,6 @@ interface ProductFiltersProps {
   statCounts: {
     all: number;
     active: number;
-    draft: number;
     inactive: number;
   };
 }
@@ -40,7 +38,7 @@ export function ProductFilters({
     <div className="space-y-4">
       {/* Status filter tabs */}
       <div className="flex gap-2 flex-wrap">
-        {(["all", "active", "draft", "inactive"] as const).map((status) => (
+        {(["all", "active", "inactive"] as const).map((status) => (
           <button
             key={status}
             onClick={() => onStatusChange(status)}

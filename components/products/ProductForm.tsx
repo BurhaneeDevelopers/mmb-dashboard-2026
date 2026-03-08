@@ -15,7 +15,7 @@ type FormData = {
   sku: string;
   categoryId: string;
   description: string;
-  status: "active" | "inactive" | "draft";
+  status: "active" | "inactive";
   masterValues: Record<string, string[]>;
 };
 
@@ -36,7 +36,7 @@ const validationSchema = Yup.object({
     .required("Please select a category"),
   description: Yup.string(),
   status: Yup.string()
-    .oneOf(["active", "inactive", "draft"])
+    .oneOf(["active", "inactive"])
     .required("Status is required"),
   masterValues: Yup.object(),
 });

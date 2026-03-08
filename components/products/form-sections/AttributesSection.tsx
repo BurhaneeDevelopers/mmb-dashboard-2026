@@ -9,7 +9,7 @@ type FormData = {
   sku: string;
   categoryId: string;
   description: string;
-  status: "active" | "inactive" | "draft";
+  status: "active" | "inactive";
   masterValues: Record<string, string[]>;
 };
 

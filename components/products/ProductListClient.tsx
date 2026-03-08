@@ -42,7 +42,6 @@ export function ProductListClient() {
   const statCounts = {
     all: products.length,
     active: products.filter((p) => p.status === "active").length,
-    draft: products.filter((p) => p.status === "draft").length,
     inactive: products.filter((p) => p.status === "inactive").length,
   };
 
