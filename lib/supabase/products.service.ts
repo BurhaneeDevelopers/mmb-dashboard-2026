@@ -50,7 +50,7 @@ export const productsService = {
   },
 
   // Get products by status
-  async getByStatus(status: 'active' | 'inactive' | 'draft'): Promise<Product[]> {
+  async getByStatus(status: 'active' | 'inactive'): Promise<Product[]> {
     const { data, error } = await supabase
       .from('products')
       .select('*')
@@ -64,7 +64,7 @@ export const productsService = {
   // Search products
   async search(query: string, filters?: {
     categoryId?: string;
-    status?: 'active' | 'inactive' | 'draft';
+    status?: 'active' | 'inactive';
   }): Promise<Product[]> {
     let queryBuilder = supabase
       .from('products')
@@ -158,7 +158,7 @@ export const productsService = {
   },
 
   // Bulk update status
-  async bulkUpdateStatus(ids: string[], status: 'active' | 'inactive' | 'draft'): Promise<void> {
+  async bulkUpdateStatus(ids: string[], status: 'active' | 'inactive'): Promise<void> {
     const { error } = await supabase
       .from('products')
       .update({ status })

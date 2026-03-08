@@ -39,7 +39,7 @@ export interface Product {
   categoryId: string;
   description: string;
   masterValues: Record<string, string[]>;
-  status: "active" | "inactive" | "draft";
+  status: "active" | "inactive";
   createdAt: string;
 }
 

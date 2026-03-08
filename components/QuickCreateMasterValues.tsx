@@ -70,11 +70,20 @@ export default function QuickCreateMasterValues({
             (v) => !existingOptions.includes(v)
           );
           return {
-            ...f,
+            id: f.id,
+            label: f.label,
+            type: 'select' as const,
             options: [...existingOptions, ...uniqueNewValues],
+            unit: f.unit,
           };
         }
-        return f;
+        return {
+          id: f.id,
+          label: f.label,
+          type: 'select' as const,
+          options: f.options,
+          unit: f.unit,
+        };
       });
 
       await updateMaster.mutateAsync({

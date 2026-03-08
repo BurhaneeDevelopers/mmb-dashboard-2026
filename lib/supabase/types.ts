@@ -110,7 +110,7 @@ export interface Database {
           sku: string
           description: string | null
           category_id: string
-          status: 'active' | 'inactive' | 'draft'
+          status: 'active' | 'inactive'
           master_values: Json
           created_at: string
           updated_at: string
@@ -121,7 +121,7 @@ export interface Database {
           sku: string
           description?: string | null
           category_id: string
-          status?: 'active' | 'inactive' | 'draft'
+          status?: 'active' | 'inactive'
           master_values?: Json
           created_at?: string
           updated_at?: string
@@ -132,7 +132,7 @@ export interface Database {
           sku?: string
           description?: string | null
           category_id?: string
-          status?: 'active' | 'inactive' | 'draft'
+          status?: 'active' | 'inactive'
           master_values?: Json
           created_at?: string
           updated_at?: string
@@ -177,7 +177,7 @@ export interface Product {
   sku: string;
   description: string;
   categoryId: string;
-  status: 'active' | 'inactive' | 'draft';
+  status: 'active' | 'inactive';
   masterValues: Record<string, string[]>;
   createdAt: string;
 }
@@ -221,7 +221,7 @@ export interface CreateProductInput {
   sku: string;
   description?: string;
   categoryId: string;
-  status: 'active' | 'inactive' | 'draft';
+  status: 'active' | 'inactive';
   masterValues: Record<string, string[]>;
 }
 

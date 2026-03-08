@@ -41,7 +41,7 @@ export function useProductsByCategory(categoryId: string) {
 }
 
 // Get products by status
-export function useProductsByStatus(status: 'active' | 'inactive' | 'draft') {
+export function useProductsByStatus(status: 'active' | 'inactive') {
   return useQuery({
     queryKey: productKeys.byStatus(status),
     queryFn: () => productsService.getByStatus(status),
@@ -51,7 +51,7 @@ export function useProductsByStatus(status: 'active' | 'inactive' | 'draft') {
 // Search products
 export function useSearchProducts(
   query: string,
-  filters?: { categoryId?: string; status?: 'active' | 'inactive' | 'draft' }
+  filters?: { categoryId?: string; status?: 'active' | 'inactive' }
 ) {
   return useQuery({
     queryKey: productKeys.list({ search: query, ...filters }),
@@ -102,7 +102,7 @@ export function useBulkUpdateProductStatus() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ ids, status }: { ids: string[]; status: 'active' | 'inactive' | 'draft' }) =>
+    mutationFn: ({ ids, status }: { ids: string[]; status: 'active' | 'inactive' }) =>
       productsService.bulkUpdateStatus(ids, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: productKeys.all });
