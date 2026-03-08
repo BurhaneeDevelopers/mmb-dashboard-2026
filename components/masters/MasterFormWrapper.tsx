@@ -18,7 +18,7 @@ export function MasterFormWrapper({ mode, masterId }: MasterFormWrapperProps) {
   if (mode === "edit" && masterId) {
     if (isLoading) {
       return (
-        <div className="max-w-2xl mx-auto py-20 text-center">
+        <div className="mx-auto py-20 text-center">
           <div className="inline-block w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
           <p className="text-sm text-slate-500 mt-4">Loading master...</p>
         </div>

@@ -71,7 +71,7 @@ export function CategoryForm({ mode, initialData, categoryId }: CategoryFormProp
   });
 
   return (
-    <div className="max-w-xl mx-auto">
+    <div className="mx-auto">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-slate-400 mb-2">
         <span

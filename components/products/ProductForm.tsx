@@ -98,7 +98,7 @@ export function ProductForm({ mode, initialData, productId }: ProductFormProps) 
 
   if (categoriesLoading || mastersLoading) {
     return (
-      <div className="max-w-2xl mx-auto py-20 text-center">
+      <div className="mx-auto py-20 text-center">
         <div className="inline-block w-8 h-8 border-4 border-pink-200 border-t-pink-600 rounded-full animate-spin" />
         <p className="text-sm text-slate-500 mt-4">Loading...</p>
       </div>
@@ -106,7 +106,7 @@ export function ProductForm({ mode, initialData, productId }: ProductFormProps) 
   }
 
   return (
-    <div className="max-w-2xl mx-auto animate-fade-in-up">
+    <div className="mx-auto animate-fade-in-up">
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-2 text-xs text-slate-400 mb-2">

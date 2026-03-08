@@ -18,7 +18,7 @@ export function ProductFormWrapper({ mode, productId }: ProductFormWrapperProps)
   if (mode === "edit" && productId) {
     if (isLoading) {
       return (
-        <div className="max-w-2xl mx-auto py-20 text-center">
+        <div className="mx-auto py-20 text-center">
           <div className="inline-block w-8 h-8 border-4 border-pink-200 border-t-pink-600 rounded-full animate-spin" />
           <p className="text-sm text-slate-500 mt-4">Loading product...</p>
         </div>

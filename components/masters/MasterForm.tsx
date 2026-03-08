@@ -116,7 +116,7 @@ export function MasterForm({ mode, initialData, masterId }: MasterFormProps) {
 
   if (categoriesLoading) {
     return (
-      <div className="max-w-2xl mx-auto py-20 text-center">
+      <div className="mx-auto py-20 text-center">
         <div className="inline-block w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
         <p className="text-sm text-slate-500 mt-4">Loading...</p>
       </div>
@@ -125,7 +125,7 @@ export function MasterForm({ mode, initialData, masterId }: MasterFormProps) {
 
   return (
     <FormikProvider value={formik}>
-      <div className="max-w-2xl mx-auto">
+      <div className="mx-auto">
         <div className="flex items-center gap-2 text-xs text-slate-400 mb-2">
           <span className="hover:text-indigo-500 cursor-pointer" onClick={() => router.push("/masters")}>
             Masters
