@@ -1,7 +1,7 @@
 import { FormikProps } from "formik";
 import { CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Master } from "@/lib/supabase/types";
+import type { Category } from "@/lib/supabase/types";
 
 type FormData = {
   name: string;
@@ -14,7 +14,7 @@ type FormData = {
 
 interface CategorySectionProps {
   selectedCategoryId: string;
-  categories: Master[];
+  categories: Category[];
   formik: FormikProps<FormData>;
 }
 
@@ -23,11 +23,11 @@ export function CategorySection({ selectedCategoryId, categories, formik }: Cate
     <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
       <div className="flex items-center gap-2 mb-5">
         <div className="w-6 h-6 rounded-full bg-pink-100 text-pink-600 text-xs font-bold flex items-center justify-center">2</div>
-        <h2 className="text-sm font-semibold text-slate-700">Select Master Category</h2>
+        <h2 className="text-sm font-semibold text-slate-700">Select Category</h2>
       </div>
 
       <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-        Choose the type of product. Once selected, all related attributes will appear below for you to fill in.
+        Choose the product category. This determines which attribute masters will be available for selection.
       </p>
 
       {formik.touched.categoryId && formik.errors.categoryId && (
@@ -63,14 +63,11 @@ export function CategorySection({ selectedCategoryId, categories, formik }: Cate
             </div>
             <p className="text-sm font-semibold text-slate-800">{cat.name}</p>
             <p className="text-[11px] text-slate-400 mt-0.5 line-clamp-1">{cat.description}</p>
-            <p className="text-[11px] mt-1.5 font-medium" style={{ color: cat.color }}>
-              {cat.fields.length} attribute{cat.fields.length !== 1 ? "s" : ""}
-            </p>
           </button>
         ))}
         {categories.length === 0 && (
           <div className="col-span-2 text-center py-8 text-sm text-slate-400">
-            No masters available — create one first
+            No categories available — create one first
           </div>
         )}
       </div>

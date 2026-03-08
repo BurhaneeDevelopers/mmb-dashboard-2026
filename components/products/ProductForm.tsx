@@ -5,7 +5,7 @@ import * as Yup from "yup";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ChevronRight, Sparkles, AlertCircle, ArrowRight } from "lucide-react";
-import { useMasters, useCreateProduct, useUpdateProduct } from "@/lib/hooks";
+import { useCategories, useMasters, useCreateProduct, useUpdateProduct } from "@/lib/hooks";
 import { BasicInfoSection } from "./form-sections/BasicInfoSection";
 import { AttributesSection } from "./form-sections/AttributesSection";
 import { CategorySection } from "./form-sections/CategorySection";
@@ -33,7 +33,7 @@ const validationSchema = Yup.object({
     .required("SKU is required")
     .min(3, "At least 3 characters"),
   categoryId: Yup.string()
-    .required("Please select a master category"),
+    .required("Please select a category"),
   description: Yup.string(),
   status: Yup.string()
     .oneOf(["active", "inactive", "draft"])
@@ -43,7 +43,8 @@ const validationSchema = Yup.object({
 
 export function ProductForm({ mode, initialData, productId }: ProductFormProps) {
   const router = useRouter();
-  const { data: masterCategories = [], isLoading: mastersLoading } = useMasters();
+  const { data: categories = [], isLoading: categoriesLoading } = useCategories();
+  const { data: allMasters = [], isLoading: mastersLoading } = useMasters();
   const createProduct = useCreateProduct();
   const updateProduct = useUpdateProduct();
 
@@ -92,9 +93,10 @@ export function ProductForm({ mode, initialData, productId }: ProductFormProps) 
     },
   });
 
-  const selectedCategory = masterCategories.find((c) => c.id === formik.values.categoryId);
+  // Filter masters by selected category
+  const categoryMasters = allMasters.filter((m) => m.categoryId === formik.values.categoryId);
 
-  if (mastersLoading) {
+  if (categoriesLoading || mastersLoading) {
     return (
       <div className="max-w-2xl mx-auto py-20 text-center">
         <div className="inline-block w-8 h-8 border-4 border-pink-200 border-t-pink-600 rounded-full animate-spin" />
@@ -122,18 +124,18 @@ export function ProductForm({ mode, initialData, productId }: ProductFormProps) 
         </p>
       </div>
 
-      {masterCategories.length === 0 && (
+      {categories.length === 0 && (
         <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3 items-center">
           <AlertCircle className="w-5 h-5 text-amber-500 shrink-0" />
           <div className="flex-1">
-            <p className="text-sm font-medium text-amber-800">No Master Categories Found</p>
-            <p className="text-xs text-amber-700 mt-0.5">You need to create at least one master before adding products.</p>
+            <p className="text-sm font-medium text-amber-800">No Categories Found</p>
+            <p className="text-xs text-amber-700 mt-0.5">You need to create at least one category before adding products.</p>
           </div>
           <button
-            onClick={() => router.push("/masters/new")}
+            onClick={() => router.push("/categories/new")}
             className="text-xs font-semibold text-amber-700 flex items-center gap-1 hover:gap-2 transition-all"
           >
-            Create Master <ArrowRight className="w-3 h-3" />
+            Create Category <ArrowRight className="w-3 h-3" />
           </button>
         </div>
       )}
@@ -143,13 +145,14 @@ export function ProductForm({ mode, initialData, productId }: ProductFormProps) 
 
         <CategorySection
           selectedCategoryId={formik.values.categoryId}
-          categories={masterCategories}
+          categories={categories}
           formik={formik}
         />
 
-        {selectedCategory && (
+        {formik.values.categoryId && categoryMasters.length > 0 && (
           <AttributesSection
-            category={selectedCategory}
+            categoryId={formik.values.categoryId}
+            masters={categoryMasters}
             formik={formik}
           />
         )}
@@ -165,7 +168,7 @@ export function ProductForm({ mode, initialData, productId }: ProductFormProps) 
           </button>
           <button
             type="submit"
-            disabled={formik.isSubmitting || masterCategories.length === 0 || createProduct.isPending || updateProduct.isPending}
+            disabled={formik.isSubmitting || categories.length === 0 || createProduct.isPending || updateProduct.isPending}
             className="flex-1 py-3 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all disabled:opacity-60"
             style={{ background: "linear-gradient(135deg, #ec4899, #f43f5e)" }}
           >

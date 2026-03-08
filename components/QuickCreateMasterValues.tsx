@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useStore } from "@/lib/store";
+import { useState, useEffect } from "react";
+import { useMasters, useUpdateMaster } from "@/lib/hooks";
 import { PlusCircle, Trash2, Sparkles, Check } from "lucide-react";
 import { toast } from "sonner";
 
@@ -18,14 +18,22 @@ export default function QuickCreateMasterValues({
   onValuesCreated,
   onClose,
 }: QuickCreateMasterValuesProps) {
-  const { masterCategories, updateMasterCategory } = useStore();
-  const master = masterCategories.find((m) => m.id === masterId);
+  const { data: masters = [] } = useMasters();
+  const updateMaster = useUpdateMaster();
+  
+  const master = masters.find((m) => m.id === masterId);
   const field = master?.fields.find((f) => f.id === fieldId);
 
   const [newValues, setNewValues] = useState<string[]>([""]);
   const [saving, setSaving] = useState(false);
 
-  if (!master || !field) return null;
+  if (!master || !field) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <p className="text-sm text-slate-400">Loading...</p>
+      </div>
+    );
+  }
 
   const handleAddValue = () => {
     setNewValues([...newValues, ""]);
@@ -43,7 +51,7 @@ export default function QuickCreateMasterValues({
     setNewValues(updated);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const validValues = newValues.filter((v) => v.trim() !== "");
     
     if (validValues.length === 0) {
@@ -53,27 +61,37 @@ export default function QuickCreateMasterValues({
 
     setSaving(true);
 
-    // Update the master field with new options
-    const updatedFields = master.fields.map((f) => {
-      if (f.id === fieldId) {
-        const existingOptions = f.options;
-        const uniqueNewValues = validValues.filter(
-          (v) => !existingOptions.includes(v)
-        );
-        return {
-          ...f,
-          options: [...existingOptions, ...uniqueNewValues],
-        };
-      }
-      return f;
-    });
+    try {
+      // Update the master field with new options
+      const updatedFields = master.fields.map((f) => {
+        if (f.id === fieldId) {
+          const existingOptions = f.options || [];
+          const uniqueNewValues = validValues.filter(
+            (v) => !existingOptions.includes(v)
+          );
+          return {
+            ...f,
+            options: [...existingOptions, ...uniqueNewValues],
+          };
+        }
+        return f;
+      });
 
-    updateMasterCategory(masterId, { fields: updatedFields });
+      await updateMaster.mutateAsync({
+        id: masterId,
+        input: { fields: updatedFields },
+      });
 
-    toast.success(`Added ${validValues.length} value${validValues.length > 1 ? "s" : ""} to ${field.label}`);
-    
-    onValuesCreated(validValues);
-    setSaving(false);
+      toast.success(`Added ${validValues.length} value${validValues.length > 1 ? "s" : ""} to ${field.label}`);
+      
+      onValuesCreated(validValues);
+    } catch (error) {
+      toast.error("Failed to add values", {
+        description: error instanceof Error ? error.message : "Please try again",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -102,7 +120,7 @@ export default function QuickCreateMasterValues({
               key={index}
               className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl p-3"
             >
-              <span className="w-6 h-6 rounded-full bg-white border border-slate-300 text-xs font-bold text-slate-500 flex items-center justify-center flex-shrink-0">
+              <span className="w-6 h-6 rounded-full bg-white border border-slate-300 text-xs font-bold text-slate-500 flex items-center justify-center shrink-0">
                 {index + 1}
               </span>
               <input
@@ -117,7 +135,7 @@ export default function QuickCreateMasterValues({
                 <button
                   type="button"
                   onClick={() => handleRemoveValue(index)}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors flex-shrink-0"
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors shrink-0"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -136,7 +154,7 @@ export default function QuickCreateMasterValues({
         </button>
 
         {/* Existing values preview */}
-        {field.options.length > 0 && (
+        {field.options && field.options.length > 0 && (
           <div className="mt-6 pt-6 border-t border-slate-200">
             <p className="text-xs font-medium text-slate-600 mb-2">
               Existing Values ({field.options.length})
@@ -173,7 +191,7 @@ export default function QuickCreateMasterValues({
           style={{ background: master.color }}
         >
           <Sparkles className="w-4 h-4" />
-          Add Values
+          {saving ? "Adding..." : "Add Values"}
         </button>
       </div>
     </div>
