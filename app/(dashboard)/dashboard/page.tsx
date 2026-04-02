@@ -1,7 +1,9 @@
 "use client";
 
-import { useStore } from "@/lib/store";
-import { Layers, Package, TrendingUp, Zap, ArrowRight, PlusCircle, ShoppingBag } from "lucide-react";
+import { useCategories } from "@/lib/hooks/use-categories";
+import { useMasters } from "@/lib/hooks/use-masters";
+import { useProducts, useRecentProducts } from "@/lib/hooks/use-products";
+import { Layers, Package, TrendingUp, Zap, ArrowRight, PlusCircle, ShoppingBag, Clock } from "lucide-react";
 import Link from "next/link";
 
 const TIPS = [
@@ -12,7 +14,10 @@ const TIPS = [
 ];
 
 export default function DashboardPage() {
-  const { masterCategories, products, categories } = useStore();
+  const { data: categories = [] } = useCategories();
+  const { data: masterCategories = [] } = useMasters();
+  const { data: products = [] } = useProducts();
+  const { data: recentProducts = [] } = useRecentProducts(3);
 
   const stats = [
     {
@@ -156,6 +161,69 @@ export default function DashboardPage() {
           ))}
         </div>
       </div>
+
+      {/* Recently Added Products */}
+      {recentProducts.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-slate-500" />
+              <h2 className="text-base font-semibold text-slate-700">Recently Added (Last 3 Days)</h2>
+            </div>
+            <Link
+              href="/products"
+              className="text-xs text-indigo-500 hover:text-indigo-600 font-medium flex items-center gap-1"
+            >
+              View all <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {recentProducts.slice(0, 6).map((product) => {
+              const category = categories.find((c) => c.id === product.categoryId);
+              const daysAgo = Math.floor(
+                (Date.now() - new Date(product.createdAt).getTime()) / (1000 * 60 * 60 * 24)
+              );
+              const timeLabel = daysAgo === 0 ? "Today" : daysAgo === 1 ? "Yesterday" : `${daysAgo} days ago`;
+
+              return (
+                <Link
+                  key={product.id}
+                  href={`/products/${product.id}/edit`}
+                  className="group bg-white border border-slate-100 rounded-xl p-4 hover:shadow-lg hover:border-indigo-200 transition-all duration-200"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-semibold text-slate-800 truncate group-hover:text-indigo-600 transition-colors">
+                        {product.name}
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-0.5">SKU: {product.sku}</p>
+                    </div>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                        product.status === "active"
+                          ? "bg-emerald-50 text-emerald-600"
+                          : "bg-slate-100 text-slate-500"
+                      }`}
+                    >
+                      {product.status}
+                    </span>
+                  </div>
+                  {category && (
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <span className="text-sm">{category.icon}</span>
+                      <span className="text-xs text-slate-500">{category.name}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1 text-xs text-slate-400 mt-3">
+                    <Clock className="w-3 h-3" />
+                    {timeLabel}
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* How it Works */}
       <div className="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 rounded-2xl p-6 border border-indigo-100">

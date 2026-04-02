@@ -184,4 +184,19 @@ export const productsService = {
     if (error) throw error;
     return data.length > 0;
   },
+
+  // Get recently added products (last N days)
+  async getRecent(days: number = 3): Promise<Product[]> {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .gte('created_at', cutoffDate.toISOString())
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data.map(transformProduct);
+  },
 };

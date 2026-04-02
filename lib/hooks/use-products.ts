@@ -118,3 +118,11 @@ export function useCheckSku(sku: string, excludeId?: string) {
     enabled: sku.length >= 3,
   });
 }
+
+// Get recently added products
+export function useRecentProducts(days: number = 3) {
+  return useQuery({
+    queryKey: [...productKeys.all, 'recent', days],
+    queryFn: () => productsService.getRecent(days),
+  });
+}
