@@ -11,6 +11,8 @@ type FormData = {
   description: string;
   status: "active" | "inactive";
   masterValues: Record<string, string[]>;
+  imageUrl?: string;
+  imageFile?: File;
 };
 
 interface AttributesSectionProps {

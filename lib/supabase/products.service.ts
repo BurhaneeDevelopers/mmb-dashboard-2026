@@ -10,6 +10,7 @@ const transformProduct = (row: any): Product => ({
   categoryId: row.category_id,
   status: row.status,
   masterValues: typeof row.master_values === 'object' ? row.master_values : {},
+  imageUrl: row.image_url || undefined,
   createdAt: row.created_at,
 });
 
@@ -103,6 +104,7 @@ export const productsService = {
         category_id: input.categoryId,
         status: input.status,
         master_values: input.masterValues,
+        image_url: input.imageUrl || null,
       })
       .select()
       .single();
@@ -128,6 +130,7 @@ export const productsService = {
     if (input.categoryId !== undefined) updateData.category_id = input.categoryId;
     if (input.status !== undefined) updateData.status = input.status;
     if (input.masterValues !== undefined) updateData.master_values = input.masterValues;
+    if (input.imageUrl !== undefined) updateData.image_url = input.imageUrl || null;
 
     const { data, error } = await supabase
       .from('products')
@@ -198,5 +201,42 @@ export const productsService = {
 
     if (error) throw error;
     return data.map(transformProduct);
+  },
+
+  // Upload product image
+  async uploadImage(file: File, productId: string): Promise<string> {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${productId}-${Date.now()}.${fileExt}`;
+    const filePath = `${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('product-images')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false,
+      });
+
+    if (uploadError) throw uploadError;
+
+    const { data } = supabase.storage
+      .from('product-images')
+      .getPublicUrl(filePath);
+
+    return data.publicUrl;
+  },
+
+  // Delete product image
+  async deleteImage(imageUrl: string): Promise<void> {
+    // Extract file path from URL
+    const urlParts = imageUrl.split('/product-images/');
+    if (urlParts.length < 2) return;
+    
+    const filePath = urlParts[1];
+
+    const { error } = await supabase.storage
+      .from('product-images')
+      .remove([filePath]);
+
+    if (error) throw error;
   },
 };

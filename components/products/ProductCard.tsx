@@ -2,6 +2,7 @@ import type { Product, Master } from "@/lib/supabase/types";
 import { Trash2, Edit } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import Image from "next/image";
 
 const STATUS_CONFIG = {
   active: { label: "Active", bg: "bg-emerald-100", text: "text-emerald-700", dot: "bg-emerald-500" },
@@ -27,14 +28,25 @@ export function ProductCard({ product, category, onDelete }: ProductCardProps) {
         />
         <div className="flex-1 p-5">
           <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3 min-w-0">
-              <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 shadow-sm"
-                style={{ background: category ? `${category.color}18` : "#f1f5f9" }}
-              >
-                {category?.icon ?? "📦"}
-              </div>
-              <div className="min-w-0">
+            <div className="flex items-start gap-3 min-w-0 flex-1">
+              {product.imageUrl ? (
+                <div className="relative w-16 h-16 rounded-xl overflow-hidden shrink-0 border border-slate-200 bg-slate-50">
+                  <Image
+                    src={product.imageUrl}
+                    alt={product.name}
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+              ) : (
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 shadow-sm"
+                  style={{ background: category ? `${category.color}18` : "#f1f5f9" }}
+                >
+                  {category?.icon ?? "📦"}
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="font-semibold text-slate-800 text-sm">{product.name}</h3>
                   <span

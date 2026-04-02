@@ -112,6 +112,7 @@ export interface Database {
           category_id: string
           status: 'active' | 'inactive'
           master_values: Json
+          image_url: string | null
           created_at: string
           updated_at: string
         }
@@ -123,6 +124,7 @@ export interface Database {
           category_id: string
           status?: 'active' | 'inactive'
           master_values?: Json
+          image_url?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -134,6 +136,7 @@ export interface Database {
           category_id?: string
           status?: 'active' | 'inactive'
           master_values?: Json
+          image_url?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -179,6 +182,7 @@ export interface Product {
   categoryId: string;
   status: 'active' | 'inactive';
   masterValues: Record<string, string[]>;
+  imageUrl?: string;
   createdAt: string;
 }
 
@@ -223,6 +227,7 @@ export interface CreateProductInput {
   categoryId: string;
   status: 'active' | 'inactive';
   masterValues: Record<string, string[]>;
+  imageUrl?: string;
 }
 
 export interface UpdateProductInput extends Partial<CreateProductInput> {}

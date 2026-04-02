@@ -6,9 +6,11 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ChevronRight, Sparkles, AlertCircle, ArrowRight } from "lucide-react";
 import { useCategories, useMasters, useCreateProduct, useUpdateProduct } from "@/lib/hooks";
+import { productsService } from "@/lib/supabase/products.service";
 import { BasicInfoSection } from "./form-sections/BasicInfoSection";
 import { AttributesSection } from "./form-sections/AttributesSection";
 import { CategorySection } from "./form-sections/CategorySection";
+import { ImageUpload } from "./ImageUpload";
 
 type FormData = {
   name: string;
@@ -17,6 +19,8 @@ type FormData = {
   description: string;
   status: "active" | "inactive";
   masterValues: Record<string, string[]>;
+  imageUrl?: string;
+  imageFile?: File;
 };
 
 interface ProductFormProps {
@@ -56,10 +60,20 @@ export function ProductForm({ mode, initialData, productId }: ProductFormProps) 
       description: "",
       status: "active",
       masterValues: {},
+      imageUrl: undefined,
+      imageFile: undefined,
     },
     validationSchema,
     onSubmit: async (values: FormData) => {
       try {
+        let imageUrl = values.imageUrl;
+
+        // Handle image upload if there's a new image file
+        if (values.imageFile) {
+          const tempId = productId || `temp-${Date.now()}`;
+          imageUrl = await productsService.uploadImage(values.imageFile, tempId);
+        }
+
         if (mode === "edit" && productId) {
           await updateProduct.mutateAsync({
             id: productId,
@@ -70,6 +84,7 @@ export function ProductForm({ mode, initialData, productId }: ProductFormProps) 
               description: values.description || undefined,
               status: values.status,
               masterValues: values.masterValues,
+              imageUrl,
             },
           });
           toast.success(`Product "${values.name}" updated!`);
@@ -81,6 +96,7 @@ export function ProductForm({ mode, initialData, productId }: ProductFormProps) 
             description: values.description || undefined,
             status: values.status,
             masterValues: values.masterValues,
+            imageUrl,
           });
           toast.success(`Product "${values.name}" created!`);
         }
@@ -142,6 +158,39 @@ export function ProductForm({ mode, initialData, productId }: ProductFormProps) 
 
       <form onSubmit={formik.handleSubmit} className="space-y-6">
         <BasicInfoSection formik={formik} />
+
+        {/* Image Upload Section */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-sm">
+              📸
+            </div>
+            <div>
+              <h3 className="font-semibold text-slate-800">Product Image</h3>
+              <p className="text-xs text-slate-500">Upload a product image (optional)</p>
+            </div>
+          </div>
+          <ImageUpload
+            value={formik.values.imageUrl}
+            onChange={(url) => {
+              if (url?.startsWith('data:')) {
+                // It's a base64 data URL from file selection
+                // Convert to File object
+                fetch(url)
+                  .then(res => res.blob())
+                  .then(blob => {
+                    const file = new File([blob], 'product-image.jpg', { type: blob.type });
+                    formik.setFieldValue('imageFile', file);
+                    formik.setFieldValue('imageUrl', url);
+                  });
+              } else {
+                formik.setFieldValue('imageUrl', url);
+                formik.setFieldValue('imageFile', undefined);
+              }
+            }}
+            disabled={formik.isSubmitting}
+          />
+        </div>
 
         <CategorySection
           selectedCategoryId={formik.values.categoryId}

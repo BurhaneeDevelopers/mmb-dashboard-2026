@@ -44,6 +44,7 @@ export function ProductFormWrapper({ mode, productId }: ProductFormWrapperProps)
           description: product.description,
           status: product.status,
           masterValues: product.masterValues,
+          imageUrl: product.imageUrl,
         }}
       />
     );
