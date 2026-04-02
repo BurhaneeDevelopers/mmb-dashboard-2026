@@ -13,6 +13,7 @@ import {
   FolderPlus,
   Layers,
   Package,
+  BookOpen,
 } from "lucide-react";
 
 const navGroups = [
@@ -20,6 +21,7 @@ const navGroups = [
     label: "Overview",
     items: [
       { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard", exact: true },
+      { href: "/onboarding", icon: BookOpen, label: "Getting Started", exact: true },
     ],
   },
   {

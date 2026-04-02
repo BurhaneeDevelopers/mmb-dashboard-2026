@@ -97,7 +97,7 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Welcome back! 👋</h1>
           <p className="text-slate-500 mt-1 text-sm">
-            Here's what's happening with your fasteners catalog today.
+            Here&apos;s what&apos;s happening with your fasteners catalog today.
           </p>
         </div>
         <Link
@@ -109,6 +109,35 @@ export default function DashboardPage() {
           New Product
         </Link>
       </div>
+
+      {/* Onboarding Banner - Show if user has no data */}
+      {categories.length === 0 && masterCategories.length === 0 && products.length === 0 && (
+        <div className="bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-2xl p-6 text-white shadow-xl">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-2xl">🚀</span>
+                <h2 className="text-xl font-bold">Get Started with FastenersPro</h2>
+              </div>
+              <p className="text-white/90 text-sm mb-4 max-w-2xl">
+                New here? Learn how to create detailed products with variants for your e-commerce site.
+                We&apos;ll walk you through categories, masters, and product creation step-by-step.
+              </p>
+              <Link
+                href="/onboarding"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-white text-indigo-600 rounded-xl text-sm font-semibold shadow-md hover:shadow-lg transition-all"
+              >
+                <Package className="w-4 h-4" />
+                Start Onboarding Guide
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+            <div className="hidden lg:block text-6xl opacity-20">
+              📚
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -180,8 +209,10 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {recentProducts.slice(0, 6).map((product) => {
               const category = categories.find((c) => c.id === product.categoryId);
+              const now = new Date();
+              const createdDate = new Date(product.createdAt);
               const daysAgo = Math.floor(
-                (Date.now() - new Date(product.createdAt).getTime()) / (1000 * 60 * 60 * 24)
+                (now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24)
               );
               const timeLabel = daysAgo === 0 ? "Today" : daysAgo === 1 ? "Yesterday" : `${daysAgo} days ago`;
 
