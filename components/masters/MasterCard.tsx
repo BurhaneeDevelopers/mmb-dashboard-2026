@@ -1,6 +1,7 @@
 import type { Master, Category } from "@/lib/supabase/types";
 import { Trash2, Edit, Package, ArrowRight, FolderOpen } from "lucide-react";
 import Link from "next/link";
+import { Button } from "../ui/button";
 
 const FIELD_TYPE_LABELS: Record<string, string> = {
   text: "Text",
@@ -35,19 +36,25 @@ export function MasterCard({ master, linkedCategory, productCount, onDelete }: M
               <p className="text-xs text-slate-400 mt-0.5">{master.description}</p>
             </div>
           </div>
-          <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="items-center shrink-0 flex">
             <Link
               href={`/masters/${master.id}/edit`}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+              className="rounded-lg flex items-center justify-center text-slate-400 hover:bg-orange-50 hover:text-orange-600 transition-colors"
             >
-              <Edit className="w-3.5 h-3.5" />
+              <Button
+                type="button"
+                size={"icon"}>
+                <Edit className="w-5 h-5" />
+              </Button>
             </Link>
-            <button
+            {/* <Button
+              type="button"
+              size={"icon"}
               onClick={() => onDelete(master.id, master.name)}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+              className="rounded-lg flex items-center justify-center text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
             >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
+              <Trash2 className="w-5 h-5" />
+            </Button> */}
           </div>
         </div>
 
@@ -142,6 +149,6 @@ export function MasterCard({ master, linkedCategory, productCount, onDelete }: M
           <ArrowRight className="w-3 h-3" />
         </Link>
       </div>
-    </div>
+    </div >
   );
 }

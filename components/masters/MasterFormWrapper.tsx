@@ -3,6 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import { useMaster } from "@/lib/hooks";
 import { MasterForm } from "./MasterForm";
+import { MASTER_COLORS, MASTER_ICONS } from "@/lib/store";
 
 interface MasterFormWrapperProps {
   mode: "create" | "edit";
@@ -19,7 +20,7 @@ export function MasterFormWrapper({ mode, masterId }: MasterFormWrapperProps) {
     if (isLoading) {
       return (
         <div className="mx-auto py-20 text-center">
-          <div className="inline-block w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+          <div className="inline-block w-8 h-8 border-4 border-orange-200 border-t-orange-600 rounded-full animate-spin" />
           <p className="text-sm text-slate-500 mt-4">Loading master...</p>
         </div>
       );
@@ -43,7 +44,10 @@ export function MasterFormWrapper({ mode, masterId }: MasterFormWrapperProps) {
           color: master.color,
           icon: master.icon,
           linkedCategoryId: master.categoryId || "",
-          fields: master.fields.map((f) => ({ label: f.label, type: "select" as const })),
+          // Convert options array back to fields array for the form
+          fields: master.fields.length > 0 && master.fields[0].options.length > 0
+            ? master.fields[0].options.map((opt) => ({ label: opt, type: "select" as const }))
+            : [{ label: "", type: "select" as const }],
         }}
       />
     );
@@ -55,8 +59,8 @@ export function MasterFormWrapper({ mode, masterId }: MasterFormWrapperProps) {
       initialData={{
         name: "",
         description: "",
-        color: "",
-        icon: "",
+        color: MASTER_COLORS[0],
+        icon: MASTER_ICONS[0],
         linkedCategoryId: preselectedCategoryId,
         fields: [{ label: "", type: "select" }],
       }}

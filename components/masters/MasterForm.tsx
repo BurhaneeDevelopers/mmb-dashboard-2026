@@ -35,10 +35,9 @@ const validationSchema = Yup.object({
   name: Yup.string()
     .required("Master name is required")
     .min(2, "At least 2 characters"),
-  description: Yup.string()
-    .required("Description is required"),
-  color: Yup.string().required(),
-  icon: Yup.string().required(),
+  description: Yup.string(),
+  color: Yup.string(),
+  icon: Yup.string(),
   linkedCategoryId: Yup.string(),
   fields: Yup.array()
     .of(
@@ -69,6 +68,18 @@ export function MasterForm({ mode, initialData, masterId }: MasterFormProps) {
     validationSchema,
     onSubmit: async (values: FormData) => {
       try {
+        // Collect all non-empty field labels as options for a single master field
+        const options = values.fields
+          .map((f) => f.label.trim())
+          .filter((label) => label !== "");
+
+        // Create ONE master_fields row with the master name as label and all values as options
+        const masterField = {
+          label: values.name, // Use master name as the field label
+          type: "select" as const,
+          options: options,
+        };
+
         if (mode === "edit" && masterId) {
           await updateMaster.mutateAsync({
             id: masterId,
@@ -78,11 +89,7 @@ export function MasterForm({ mode, initialData, masterId }: MasterFormProps) {
               color: values.color,
               icon: values.icon,
               categoryId: values.linkedCategoryId || undefined,
-              fields: values.fields.map((f) => ({
-                label: f.label,
-                type: "select" as const,
-                options: [],
-              })),
+              fields: [masterField],
             },
           });
           toast.success(`Master "${values.name}" updated!`);
@@ -93,14 +100,10 @@ export function MasterForm({ mode, initialData, masterId }: MasterFormProps) {
             color: values.color,
             icon: values.icon,
             categoryId: values.linkedCategoryId || undefined,
-            fields: values.fields.map((f) => ({
-              label: f.label,
-              type: "select" as const,
-              options: [],
-            })),
+            fields: [masterField],
           });
           toast.success(`Master "${values.name}" created!`, {
-            description: `${values.fields.length} value${values.fields.length > 1 ? "s" : ""} added.`,
+            description: `${options.length} value${options.length > 1 ? "s" : ""} added.`,
           });
         }
         router.push("/masters");
@@ -117,7 +120,7 @@ export function MasterForm({ mode, initialData, masterId }: MasterFormProps) {
   if (categoriesLoading) {
     return (
       <div className="mx-auto py-20 text-center">
-        <div className="inline-block w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+        <div className="inline-block w-8 h-8 border-4 border-orange-200 border-t-orange-600 rounded-full animate-spin" />
         <p className="text-sm text-slate-500 mt-4">Loading...</p>
       </div>
     );
@@ -127,7 +130,7 @@ export function MasterForm({ mode, initialData, masterId }: MasterFormProps) {
     <FormikProvider value={formik}>
       <div className="mx-auto">
         <div className="flex items-center gap-2 text-xs text-slate-400 mb-2">
-          <span className="hover:text-indigo-500 cursor-pointer" onClick={() => router.push("/masters")}>
+          <span className="hover:text-orange-500 cursor-pointer" onClick={() => router.push("/masters")}>
             Masters
           </span>
           <ChevronRight className="w-3 h-3" />
@@ -164,7 +167,7 @@ export function MasterForm({ mode, initialData, masterId }: MasterFormProps) {
               type="submit"
               disabled={formik.isSubmitting || createMaster.isPending || updateMaster.isPending}
               className="flex-1 py-3 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all disabled:opacity-60"
-              style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}
+              style={{ background: "linear-gradient(135deg, #f97316, #ea580c)" }}
             >
               <Sparkles className="w-4 h-4" />
               {mode === "edit" ? "Update Master" : "Create Master"}
