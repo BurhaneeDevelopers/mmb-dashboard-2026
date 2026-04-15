@@ -17,7 +17,7 @@ type FormData = {
   sku: string;
   categoryId: string;
   description: string;
-  status: "active" | "inactive";
+  status: "active" | "inactive" | "draft";
   masterValues: Record<string, string[]>;
   imageUrl?: string;
   imageFile?: File;
@@ -40,7 +40,7 @@ const validationSchema = Yup.object({
     .required("Please select a category"),
   description: Yup.string(),
   status: Yup.string()
-    .oneOf(["active", "inactive"])
+    .oneOf(["active", "inactive", "draft"])
     .required("Status is required"),
   masterValues: Yup.object(),
 });
@@ -74,7 +74,10 @@ export function ProductForm({ mode, initialData, productId }: ProductFormProps) 
           imageUrl = await productsService.uploadImage(values.imageFile, tempId);
         }
 
-        if (mode === "edit" && productId) {
+        // Convert masterValues (field_id -> values[]) to masterValueIds
+        const masterValueIds = await productsService.convertMasterValuesToIds(values.masterValues);
+
+        if (mode === 'edit' && productId) {
           await updateProduct.mutateAsync({
             id: productId,
             input: {
@@ -83,7 +86,7 @@ export function ProductForm({ mode, initialData, productId }: ProductFormProps) 
               categoryId: values.categoryId,
               description: values.description || undefined,
               status: values.status,
-              masterValues: values.masterValues,
+              masterValueIds,
               imageUrl,
             },
           });
@@ -95,7 +98,7 @@ export function ProductForm({ mode, initialData, productId }: ProductFormProps) 
             categoryId: values.categoryId,
             description: values.description || undefined,
             status: values.status,
-            masterValues: values.masterValues,
+            masterValueIds,
             imageUrl,
           });
           toast.success(`Product "${values.name}" created!`);

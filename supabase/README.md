@@ -1,237 +1,197 @@
-# Supabase Database Setup
+# Supabase Database Schema
 
-This directory contains the database schema and migrations for the FastenersPro application.
+This directory contains the database migrations for the FastenersPro application.
 
-## Database Schema Overview
+## Schema Overview
 
-### Tables
+The database uses a relational structure with the following tables:
 
-1. **categories** - Product categories (e.g., "Die Springs", "Ejector Pins")
-2. **masters** - Attribute types (e.g., "Size", "Length", "Material")
-3. **master_fields** - Specific fields for each master with their options
-4. **products** - Actual products in the catalog
+### Core Tables
 
-### Hierarchy
+1. **categories** - Product categories (e.g., Die Springs, Ejector Pins)
+2. **masters** - Attribute types (e.g., Size, Length, Material) linked to categories
+3. **master_fields** - Specific fields for each master with configuration
+4. **master_values** - Individual values for master fields (e.g., "M6", "M8")
+5. **products** - Actual products in the catalog
+6. **product_master_values** - Junction table linking products to master values
+
+### Relationships
 
 ```
-Categories (Product Types)
-├── Die Springs
-│   ├── Master: Size (M6, M8, M10, M12, M16)
-│   └── Master: Load (Light, Medium, Heavy, Extra Heavy)
-└── Ejector Pins
-    ├── Master: Length (50mm, 75mm, 100mm, 150mm, 200mm)
-    └── Master: Material (SKD61, SKH51, Nitrided Steel, Stainless Steel)
-
-Products
-└── Each product belongs to ONE category and has values from that category's masters
+categories (1) -----> (N) masters
+masters (1) -----> (N) master_fields
+master_fields (1) -----> (N) master_values
+products (N) <-----> (N) master_values (via product_master_values)
+categories (1) -----> (N) products
 ```
 
-## Setup Instructions
+## Migration Files
 
-### 1. Create a Supabase Project
+### 001_initial_schema.sql
+Initial schema with JSONB-based master values (deprecated approach).
 
-1. Go to [https://supabase.com](https://supabase.com)
-2. Create a new project
-3. Wait for the project to be provisioned
+### 002_add_product_images.sql
+Adds image_url column to products table.
 
-### 2. Run the Migration
+### 003_refactor_to_relational_master_values.sql
+Refactors from JSONB to relational structure:
+- Creates `master_values` table
+- Creates `product_master_values` junction table
+- Removes `master_values` JSONB column from products
+- Adds helper functions for querying
 
-**Option A: Using Supabase Dashboard (Recommended)**
+### 004_complete_schema.sql
+Complete schema file that can be run on a fresh database. Includes:
+- All tables in proper dependency order
+- Indexes for performance
+- Row Level Security (RLS) policies
+- Helper functions
+- Triggers for updated_at timestamps
 
-1. Go to your Supabase project dashboard
-2. Navigate to **SQL Editor**
-3. Click **New Query**
-4. Copy the contents of `migrations/001_initial_schema.sql`
-5. Paste into the SQL editor
-6. Click **Run** or press `Ctrl+Enter`
+## Running Migrations
 
-**Option B: Using Supabase CLI**
+### Option 1: Sequential Migrations (Existing Database)
+If you already have data from migration 001:
 
 ```bash
-# Install Supabase CLI
-npm install -g supabase
-
-# Login to Supabase
-supabase login
-
-# Link to your project
-supabase link --project-ref your-project-ref
-
-# Run migrations
+# Run migrations in order
 supabase db push
 ```
 
-### 3. Configure Environment Variables
+### Option 2: Fresh Database
+For a new database, you can run the complete schema:
 
-1. Copy `.env.example` to `.env.local`
-2. Get your Supabase credentials from the project settings:
-   - Go to **Settings** → **API**
-   - Copy the **Project URL** and **anon/public key**
-3. Update `.env.local` with your credentials
+```bash
+# Reset database (WARNING: destroys all data)
+supabase db reset
 
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
+# Or manually run 004_complete_schema.sql
+psql -h your-host -U postgres -d your-db -f supabase/migrations/004_complete_schema.sql
 ```
 
-### 4. Verify Setup
-
-After running the migration, verify that:
-
-1. All 4 tables are created (categories, masters, master_fields, products)
-2. RLS policies are enabled
-3. Seed data is inserted (2 categories, 4 masters, 4 master fields)
-
-You can check this in the Supabase dashboard:
-- **Table Editor** - View tables and data
-- **Authentication** → **Policies** - View RLS policies
-
-## Row Level Security (RLS) Policies
-
-### Public Access (Ecommerce Site)
-
-✅ **READ access for everyone:**
-- Categories (all)
-- Masters (all)
-- Master Fields (all)
-- Products (only `status = 'active'`)
-
-### Admin Access (Dashboard)
-
-✅ **Full CRUD access for authenticated users:**
-- Categories (create, read, update, delete)
-- Masters (create, read, update, delete)
-- Master Fields (create, read, update, delete)
-- Products (create, read, update, delete - including drafts and inactive)
-
-### Security Notes
-
-- Public users can only see **active** products
-- Authenticated admin users can see all products (active, inactive, draft)
-- All write operations require authentication
-- Products with `status = 'draft'` or `status = 'inactive'` are hidden from public
-
-## Helper Functions
-
-The migration includes useful helper functions:
-
-### `get_category_masters(category_uuid)`
-
-Get all masters and their fields for a specific category.
-
-```sql
-SELECT * FROM get_category_masters('cat-1');
-```
-
-### `search_products(search_term, category_filter, status_filter)`
-
-Search products with optional filters.
-
-```sql
--- Search all active products
-SELECT * FROM search_products('spring', NULL, 'active');
-
--- Search products in a specific category
-SELECT * FROM search_products('', 'cat-1', 'active');
-```
-
-## Data Model
+## Schema Details
 
 ### Categories Table
-
-```typescript
-{
-  id: UUID
-  name: string (2-100 chars)
-  description: string (5-500 chars)
-  color: string (hex color)
-  icon: string (emoji)
-  created_at: timestamp
-  updated_at: timestamp
-}
+```sql
+- id: UUID (PK)
+- name: TEXT (2-100 chars)
+- description: TEXT (5-500 chars)
+- color: TEXT (hex color)
+- icon: TEXT (emoji or icon name)
+- created_at, updated_at: TIMESTAMPTZ
 ```
 
 ### Masters Table
-
-```typescript
-{
-  id: UUID
-  name: string (2-100 chars)
-  description: string (5-500 chars)
-  color: string (hex color)
-  icon: string (emoji)
-  category_id: UUID (nullable, references categories)
-  created_at: timestamp
-  updated_at: timestamp
-}
+```sql
+- id: UUID (PK)
+- name: TEXT (2-100 chars)
+- description: TEXT (5-500 chars)
+- color: TEXT
+- icon: TEXT
+- category_id: UUID (FK -> categories, nullable)
+- created_at, updated_at: TIMESTAMPTZ
 ```
 
 ### Master Fields Table
+```sql
+- id: UUID (PK)
+- master_id: UUID (FK -> masters)
+- label: TEXT (1-100 chars)
+- type: TEXT ('select', 'text', 'number', 'color')
+- options: JSONB (array of options for select type)
+- unit: TEXT (nullable, e.g., 'mm', 'kg')
+- sort_order: INTEGER
+- created_at: TIMESTAMPTZ
+```
 
-```typescript
-{
-  id: UUID
-  master_id: UUID (references masters)
-  label: string (1-100 chars)
-  type: 'select' | 'text' | 'number' | 'color'
-  options: JSON array of strings
-  unit: string (nullable, e.g., "mm", "kg")
-  sort_order: integer
-  created_at: timestamp
-}
+### Master Values Table
+```sql
+- id: UUID (PK)
+- master_field_id: UUID (FK -> master_fields)
+- value: TEXT
+- created_at: TIMESTAMPTZ
+- UNIQUE(master_field_id, value)
 ```
 
 ### Products Table
-
-```typescript
-{
-  id: UUID
-  name: string (2-200 chars)
-  sku: string (3-100 chars, unique)
-  description: string (nullable)
-  category_id: UUID (references categories)
-  status: 'active' | 'inactive' | 'draft'
-  master_values: JSONB { "field_id": ["value1", "value2"] }
-  created_at: timestamp
-  updated_at: timestamp
-}
+```sql
+- id: UUID (PK)
+- name: TEXT (2-200 chars)
+- sku: TEXT (3-100 chars, unique)
+- description: TEXT (nullable)
+- category_id: UUID (FK -> categories)
+- status: TEXT ('active', 'inactive', 'draft')
+- image_url: TEXT (nullable, max 500 chars)
+- created_at, updated_at: TIMESTAMPTZ
 ```
+
+### Product Master Values Table
+```sql
+- id: UUID (PK)
+- product_id: UUID (FK -> products)
+- master_value_id: UUID (FK -> master_values)
+- UNIQUE(product_id, master_value_id)
+```
+
+## Helper Functions
+
+### get_product_with_values(product_uuid)
+Returns a product with all its master values aggregated as JSONB.
+
+### get_master_field_values(field_uuid)
+Returns all values for a specific master field.
+
+### search_products_with_values(search_term, category_filter, status_filter)
+Searches products with optional filters and returns master values.
+
+### get_category_masters(category_uuid)
+Returns all masters for a category with their fields.
+
+## Row Level Security (RLS)
+
+All tables have RLS enabled with the following policies:
+
+- **Public Read**: Everyone can view active products and all categories/masters
+- **Authenticated Write**: Only authenticated users can create/update/delete
+- **Draft Protection**: Draft products are only visible to authenticated users
 
 ## Indexes
 
-The schema includes optimized indexes for:
-- Fast category/master/product lookups
-- Efficient filtering by status
-- Quick SKU searches
-- JSONB queries on master_values
-- Sorted listings by creation date
+Performance indexes are created on:
+- Foreign keys (category_id, master_id, etc.)
+- Search fields (name, sku)
+- Sort fields (created_at, sort_order)
+- Junction table lookups (product_id, master_value_id)
 
-## Troubleshooting
+## Data Migration Notes
 
-### Migration Fails
+If migrating from the JSONB approach (migration 001) to the relational approach (migration 003):
 
-- Check if you have the correct permissions
-- Ensure the `uuid-ossp` extension is enabled
-- Verify no existing tables with the same names
+1. The `master_values` JSONB column in products is removed
+2. You'll need to migrate existing data:
+   - Extract values from JSONB
+   - Create corresponding `master_values` records
+   - Link via `product_master_values` table
 
-### RLS Policies Not Working
+Example migration script would:
+```sql
+-- For each product with master_values JSONB
+-- 1. Parse the JSONB structure
+-- 2. For each field_id and value in the JSONB:
+--    a. Create or find master_value record
+--    b. Create product_master_values link
+```
 
-- Ensure RLS is enabled on all tables
-- Check if you're using the correct Supabase client (anon key for public, authenticated for admin)
-- Verify authentication is working correctly
+## TypeScript Integration
 
-### Can't See Products on Ecommerce Site
+The schema is integrated with TypeScript types in:
+- `lib/supabase/types.ts` - Database and application types
+- `lib/supabase/products.service.ts` - Product and master values services
+- `lib/supabase/masters.service.ts` - Masters and fields services
 
-- Check if products have `status = 'active'`
-- Verify RLS policies are correctly applied
-- Check browser console for errors
+## Storage
 
-## Next Steps
-
-After setting up the database:
-
-1. Install Supabase client: `npm install @supabase/supabase-js`
-2. Create Supabase client utility in your Next.js app
-3. Replace the local store with Supabase queries
-4. Implement authentication for admin dashboard
-5. Set up Tanstack Query for data fetching
+Product images are stored in Supabase Storage:
+- Bucket: `product-images`
+- Public access enabled
+- URLs stored in `products.image_url`

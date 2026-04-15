@@ -2,13 +2,20 @@ import { supabase } from './client';
 import type { Master, MasterField, CreateMasterInput, UpdateMasterInput } from './types';
 
 // Transform database row to application type
-const transformMasterField = (row: any): MasterField => ({
-  id: row.id,
-  label: row.label,
-  type: row.type as 'select' | 'text' | 'number' | 'color',
-  options: Array.isArray(row.options) ? row.options : [],
-  unit: row.unit || undefined,
-});
+const transformMasterField = (row: any): MasterField => {
+  // Get options from master_values if available, otherwise fall back to options JSONB
+  const options = row.master_values && Array.isArray(row.master_values)
+    ? row.master_values.map((mv: any) => mv.value)
+    : (Array.isArray(row.options) ? row.options : []);
+  
+  return {
+    id: row.id,
+    label: row.label,
+    type: row.type as 'select' | 'text' | 'number' | 'color',
+    options,
+    unit: row.unit || undefined,
+  };
+};
 
 const transformMaster = (row: any): Master => ({
   id: row.id,
@@ -28,7 +35,10 @@ export const mastersService = {
       .from('masters')
       .select(`
         *,
-        master_fields(*)
+        master_fields(
+          *,
+          master_values(value)
+        )
       `)
       .order('created_at', { ascending: false });
 
@@ -42,7 +52,10 @@ export const mastersService = {
       .from('masters')
       .select(`
         *,
-        master_fields(*)
+        master_fields(
+          *,
+          master_values(value)
+        )
       `)
       .eq('id', id)
       .single();
@@ -57,7 +70,10 @@ export const mastersService = {
       .from('masters')
       .select(`
         *,
-        master_fields(*)
+        master_fields(
+          *,
+          master_values(value)
+        )
       `)
       .eq('category_id', categoryId)
       .order('created_at', { ascending: false });
@@ -83,25 +99,42 @@ export const mastersService = {
 
     if (masterError) throw masterError;
 
-    // Insert fields
+    // Insert fields and their values
     if (input.fields && input.fields.length > 0) {
-      const fieldsToInsert = input.fields.map((field, index) => ({
-        master_id: masterData.id,
-        label: field.label,
-        type: field.type,
-        options: field.options,
-        unit: field.unit || null,
-        sort_order: index,
-      }));
+      for (let index = 0; index < input.fields.length; index++) {
+        const field = input.fields[index];
+        
+        // Insert field
+        const { data: fieldData, error: fieldError } = await supabase
+          .from('master_fields')
+          .insert({
+            master_id: masterData.id,
+            label: field.label,
+            type: field.type,
+            unit: field.unit || null,
+            sort_order: index,
+          })
+          .select()
+          .single();
 
-      const { error: fieldsError } = await supabase
-        .from('master_fields')
-        .insert(fieldsToInsert);
+        if (fieldError) throw fieldError;
 
-      if (fieldsError) throw fieldsError;
+        // Insert values for this field
+        if (field.options && field.options.length > 0) {
+          const valuesToInsert = field.options.map(value => ({
+            master_field_id: fieldData.id,
+            value,
+          }));
+
+          const { error: valuesError } = await supabase
+            .from('master_values')
+            .insert(valuesToInsert);
+
+          if (valuesError) throw valuesError;
+        }
+      }
     }
 
-    // Fetch complete master with fields
     return this.getById(masterData.id);
   },
 
@@ -123,7 +156,7 @@ export const mastersService = {
 
     // Update fields if provided
     if (input.fields) {
-      // Delete existing fields
+      // Delete existing fields (cascade will delete values)
       const { error: deleteError } = await supabase
         .from('master_fields')
         .delete()
@@ -131,26 +164,43 @@ export const mastersService = {
 
       if (deleteError) throw deleteError;
 
-      // Insert new fields
+      // Insert new fields and values
       if (input.fields.length > 0) {
-        const fieldsToInsert = input.fields.map((field, index) => ({
-          master_id: id,
-          label: field.label,
-          type: field.type,
-          options: field.options,
-          unit: field.unit || null,
-          sort_order: index,
-        }));
+        for (let index = 0; index < input.fields.length; index++) {
+          const field = input.fields[index];
+          
+          // Insert field
+          const { data: fieldData, error: fieldError } = await supabase
+            .from('master_fields')
+            .insert({
+              master_id: id,
+              label: field.label,
+              type: field.type,
+              unit: field.unit || null,
+              sort_order: index,
+            })
+            .select()
+            .single();
 
-        const { error: fieldsError } = await supabase
-          .from('master_fields')
-          .insert(fieldsToInsert);
+          if (fieldError) throw fieldError;
 
-        if (fieldsError) throw fieldsError;
+          // Insert values for this field
+          if (field.options && field.options.length > 0) {
+            const valuesToInsert = field.options.map(value => ({
+              master_field_id: fieldData.id,
+              value,
+            }));
+
+            const { error: valuesError } = await supabase
+              .from('master_values')
+              .insert(valuesToInsert);
+
+            if (valuesError) throw valuesError;
+          }
+        }
       }
     }
 
-    // Fetch updated master with fields
     return this.getById(id);
   },
 
@@ -202,5 +252,38 @@ export const mastersService = {
 
       if (updateError) throw updateError;
     }
+  },
+
+  // Get all master values for a field
+  async getFieldValues(fieldId: string) {
+    const { data, error } = await supabase
+      .from('master_values')
+      .select('*')
+      .eq('master_field_id', fieldId)
+      .order('value');
+
+    if (error) throw error;
+    return data;
+  },
+
+  // Create master value
+  async createFieldValue(fieldId: string, value: string) {
+    const { data, error } = await supabase
+      .from('master_values')
+      .insert({
+        master_field_id: fieldId,
+        value,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === '23505') {
+        throw new Error('This value already exists for this field');
+      }
+      throw error;
+    }
+
+    return data;
   },
 };

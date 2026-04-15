@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 const STATUS_OPTIONS = [
   { value: "active", label: "Active", emoji: "🟢", desc: "Visible and available", color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-200" },
   { value: "inactive", label: "Inactive", emoji: "🔴", desc: "Hidden from catalog", color: "text-red-500", bg: "bg-red-50", border: "border-red-200" },
+  { value: "draft", label: "Draft", emoji: "📝", desc: "Work in progress", color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200" },
 ];
 
 type FormData = {
@@ -11,7 +12,7 @@ type FormData = {
   sku: string;
   categoryId: string;
   description: string;
-  status: "active" | "inactive";
+  status: "active" | "inactive" | "draft";
   masterValues: Record<string, string[]>;
   imageUrl?: string;
   imageFile?: File;

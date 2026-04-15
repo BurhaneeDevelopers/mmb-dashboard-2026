@@ -1,23 +1,27 @@
 -- =====================================================
--- FastenersPro Database Schema
+-- FastenersPro Complete Database Schema
 -- =====================================================
--- This schema supports a fasteners catalog management system
--- with Categories, Masters (attributes), and Products
--- 
--- Hierarchy:
--- 1. Categories (e.g., "Die Springs", "Ejector Pins")
--- 2. Masters (e.g., "Size", "Length", "Material") - linked to Categories
--- 3. Products - belong to one Category, have values from its Masters
+-- Clean schema with proper relational structure
 -- =====================================================
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- =====================================================
+-- HELPER FUNCTIONS
+-- =====================================================
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- =====================================================
 -- CATEGORIES TABLE
 -- =====================================================
--- Categories represent product types (e.g., Die Springs, Ejector Pins)
-CREATE TABLE categories (
+CREATE TABLE IF NOT EXISTS categories (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL,
     description TEXT NOT NULL,
@@ -26,21 +30,22 @@ CREATE TABLE categories (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     
-    -- Constraints
     CONSTRAINT categories_name_length CHECK (char_length(name) >= 2 AND char_length(name) <= 100),
     CONSTRAINT categories_description_length CHECK (char_length(description) >= 5 AND char_length(description) <= 500)
 );
 
--- Index for faster queries
-CREATE INDEX idx_categories_created_at ON categories(created_at DESC);
-CREATE INDEX idx_categories_name ON categories(name);
+CREATE INDEX IF NOT EXISTS idx_categories_created_at ON categories(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_categories_name ON categories(name);
+
+CREATE TRIGGER update_categories_updated_at
+    BEFORE UPDATE ON categories
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
 
 -- =====================================================
 -- MASTERS TABLE
 -- =====================================================
--- Masters represent attribute types (e.g., Size, Length, Material)
--- that can be linked to multiple categories
-CREATE TABLE masters (
+CREATE TABLE IF NOT EXISTS masters (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL,
     description TEXT NOT NULL,
@@ -50,93 +55,78 @@ CREATE TABLE masters (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     
-    -- Constraints
     CONSTRAINT masters_name_length CHECK (char_length(name) >= 2 AND char_length(name) <= 100),
     CONSTRAINT masters_description_length CHECK (char_length(description) >= 5 AND char_length(description) <= 500)
 );
 
--- Indexes
-CREATE INDEX idx_masters_category_id ON masters(category_id);
-CREATE INDEX idx_masters_created_at ON masters(created_at DESC);
-CREATE INDEX idx_masters_name ON masters(name);
+CREATE INDEX IF NOT EXISTS idx_masters_category_id ON masters(category_id);
+CREATE INDEX IF NOT EXISTS idx_masters_created_at ON masters(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_masters_name ON masters(name);
+
+CREATE TRIGGER update_masters_updated_at
+    BEFORE UPDATE ON masters
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
 
 -- =====================================================
 -- MASTER FIELDS TABLE
 -- =====================================================
--- Fields define the specific attributes for each master
--- (e.g., Master "Size" has field "Size" with options ["M6", "M8", "M10"])
-CREATE TABLE master_fields (
+CREATE TABLE IF NOT EXISTS master_fields (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     master_id UUID NOT NULL REFERENCES masters(id) ON DELETE CASCADE,
     label TEXT NOT NULL,
     type TEXT NOT NULL DEFAULT 'select',
-    options JSONB NOT NULL DEFAULT '[]'::jsonb,
     unit TEXT,
     sort_order INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     
-    -- Constraints
     CONSTRAINT master_fields_type_check CHECK (type IN ('select', 'text', 'number', 'color')),
     CONSTRAINT master_fields_label_length CHECK (char_length(label) >= 1 AND char_length(label) <= 100)
 );
 
--- Indexes
-CREATE INDEX idx_master_fields_master_id ON master_fields(master_id);
-CREATE INDEX idx_master_fields_sort_order ON master_fields(master_id, sort_order);
+CREATE INDEX IF NOT EXISTS idx_master_fields_master_id ON master_fields(master_id);
+CREATE INDEX IF NOT EXISTS idx_master_fields_sort_order ON master_fields(master_id, sort_order);
+
+-- =====================================================
+-- MASTER VALUES TABLE
+-- =====================================================
+CREATE TABLE IF NOT EXISTS master_values (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    master_field_id UUID NOT NULL REFERENCES master_fields(id) ON DELETE CASCADE,
+    value TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    CONSTRAINT master_values_master_field_id_value_key UNIQUE (master_field_id, value)
+);
+
+CREATE INDEX IF NOT EXISTS idx_master_values_master_field_id ON master_values(master_field_id);
+CREATE INDEX IF NOT EXISTS idx_master_values_value ON master_values(value);
 
 -- =====================================================
 -- PRODUCTS TABLE
 -- =====================================================
--- Products are the actual items in the catalog
-CREATE TABLE products (
+CREATE TABLE IF NOT EXISTS products (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL,
     sku TEXT NOT NULL UNIQUE,
     description TEXT,
     category_id UUID NOT NULL REFERENCES categories(id) ON DELETE RESTRICT,
     status TEXT NOT NULL DEFAULT 'active',
-    master_values JSONB NOT NULL DEFAULT '{}'::jsonb,
+    image_url TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     
-    -- Constraints
     CONSTRAINT products_name_length CHECK (char_length(name) >= 2 AND char_length(name) <= 200),
     CONSTRAINT products_sku_length CHECK (char_length(sku) >= 3 AND char_length(sku) <= 100),
-    CONSTRAINT products_status_check CHECK (status IN ('active', 'inactive', 'draft'))
+    CONSTRAINT products_status_check CHECK (status IN ('active', 'inactive', 'draft')),
+    CONSTRAINT products_image_url_length CHECK (image_url IS NULL OR char_length(image_url) <= 500)
 );
 
--- Indexes
-CREATE INDEX idx_products_category_id ON products(category_id);
-CREATE INDEX idx_products_status ON products(status);
-CREATE INDEX idx_products_sku ON products(sku);
-CREATE INDEX idx_products_created_at ON products(created_at DESC);
-CREATE INDEX idx_products_name ON products(name);
-
--- GIN index for JSONB master_values for efficient querying
-CREATE INDEX idx_products_master_values ON products USING GIN (master_values);
-
--- =====================================================
--- UPDATED_AT TRIGGER FUNCTION
--- =====================================================
--- Automatically update the updated_at timestamp
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- Apply trigger to tables
-CREATE TRIGGER update_categories_updated_at
-    BEFORE UPDATE ON categories
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_masters_updated_at
-    BEFORE UPDATE ON masters
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
+CREATE INDEX IF NOT EXISTS idx_products_category_id ON products(category_id);
+CREATE INDEX IF NOT EXISTS idx_products_status ON products(status);
+CREATE INDEX IF NOT EXISTS idx_products_sku ON products(sku);
+CREATE INDEX IF NOT EXISTS idx_products_created_at ON products(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_products_name ON products(name);
 
 CREATE TRIGGER update_products_updated_at
     BEFORE UPDATE ON products
@@ -144,243 +134,71 @@ CREATE TRIGGER update_products_updated_at
     EXECUTE FUNCTION update_updated_at_column();
 
 -- =====================================================
+-- PRODUCT MASTER VALUES TABLE (Junction Table)
+-- =====================================================
+CREATE TABLE IF NOT EXISTS product_master_values (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    master_value_id UUID NOT NULL REFERENCES master_values(id) ON DELETE CASCADE,
+    
+    CONSTRAINT product_master_values_product_master_unique UNIQUE (product_id, master_value_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_product_master_values_product_id ON product_master_values(product_id);
+CREATE INDEX IF NOT EXISTS idx_product_master_values_master_value_id ON product_master_values(master_value_id);
+
+-- =====================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES
 -- =====================================================
-
--- Enable RLS on all tables
 ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE masters ENABLE ROW LEVEL SECURITY;
 ALTER TABLE master_fields ENABLE ROW LEVEL SECURITY;
+ALTER TABLE master_values ENABLE ROW LEVEL SECURITY;
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE product_master_values ENABLE ROW LEVEL SECURITY;
+
+-- Categories Policies
+CREATE POLICY "Categories are viewable by everyone" ON categories FOR SELECT USING (true);
+CREATE POLICY "Authenticated users can insert categories" ON categories FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Authenticated users can update categories" ON categories FOR UPDATE USING (auth.role() = 'authenticated');
+CREATE POLICY "Authenticated users can delete categories" ON categories FOR DELETE USING (auth.role() = 'authenticated');
+
+-- Masters Policies
+CREATE POLICY "Masters are viewable by everyone" ON masters FOR SELECT USING (true);
+CREATE POLICY "Authenticated users can insert masters" ON masters FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Authenticated users can update masters" ON masters FOR UPDATE USING (auth.role() = 'authenticated');
+CREATE POLICY "Authenticated users can delete masters" ON masters FOR DELETE USING (auth.role() = 'authenticated');
+
+-- Master Fields Policies
+CREATE POLICY "Master fields are viewable by everyone" ON master_fields FOR SELECT USING (true);
+CREATE POLICY "Authenticated users can insert master fields" ON master_fields FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Authenticated users can update master fields" ON master_fields FOR UPDATE USING (auth.role() = 'authenticated');
+CREATE POLICY "Authenticated users can delete master fields" ON master_fields FOR DELETE USING (auth.role() = 'authenticated');
+
+-- Master Values Policies
+CREATE POLICY "Master values are viewable by everyone" ON master_values FOR SELECT USING (true);
+CREATE POLICY "Authenticated users can insert master values" ON master_values FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Authenticated users can update master values" ON master_values FOR UPDATE USING (auth.role() = 'authenticated');
+CREATE POLICY "Authenticated users can delete master values" ON master_values FOR DELETE USING (auth.role() = 'authenticated');
+
+-- Products Policies
+CREATE POLICY "Active products are viewable by everyone" ON products FOR SELECT USING (status = 'active' OR auth.role() = 'authenticated');
+CREATE POLICY "Authenticated users can insert products" ON products FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Authenticated users can update products" ON products FOR UPDATE USING (auth.role() = 'authenticated');
+CREATE POLICY "Authenticated users can delete products" ON products FOR DELETE USING (auth.role() = 'authenticated');
+
+-- Product Master Values Policies
+CREATE POLICY "Product master values are viewable by everyone" ON product_master_values FOR SELECT USING (true);
+CREATE POLICY "Authenticated users can insert product master values" ON product_master_values FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Authenticated users can update product master values" ON product_master_values FOR UPDATE USING (auth.role() = 'authenticated');
+CREATE POLICY "Authenticated users can delete product master values" ON product_master_values FOR DELETE USING (auth.role() = 'authenticated');
 
 -- =====================================================
--- CATEGORIES RLS POLICIES
+-- COMMENTS
 -- =====================================================
-
--- Public read access (for ecommerce site)
-CREATE POLICY "Categories are viewable by everyone"
-    ON categories FOR SELECT
-    USING (true);
-
--- Authenticated users can insert
-CREATE POLICY "Authenticated users can insert categories"
-    ON categories FOR INSERT
-    WITH CHECK (auth.role() = 'authenticated');
-
--- Authenticated users can update
-CREATE POLICY "Authenticated users can update categories"
-    ON categories FOR UPDATE
-    USING (auth.role() = 'authenticated')
-    WITH CHECK (auth.role() = 'authenticated');
-
--- Authenticated users can delete
-CREATE POLICY "Authenticated users can delete categories"
-    ON categories FOR DELETE
-    USING (auth.role() = 'authenticated');
-
--- =====================================================
--- MASTERS RLS POLICIES
--- =====================================================
-
--- Public read access (for ecommerce site)
-CREATE POLICY "Masters are viewable by everyone"
-    ON masters FOR SELECT
-    USING (true);
-
--- Authenticated users can insert
-CREATE POLICY "Authenticated users can insert masters"
-    ON masters FOR INSERT
-    WITH CHECK (auth.role() = 'authenticated');
-
--- Authenticated users can update
-CREATE POLICY "Authenticated users can update masters"
-    ON masters FOR UPDATE
-    USING (auth.role() = 'authenticated')
-    WITH CHECK (auth.role() = 'authenticated');
-
--- Authenticated users can delete
-CREATE POLICY "Authenticated users can delete masters"
-    ON masters FOR DELETE
-    USING (auth.role() = 'authenticated');
-
--- =====================================================
--- MASTER FIELDS RLS POLICIES
--- =====================================================
-
--- Public read access (for ecommerce site)
-CREATE POLICY "Master fields are viewable by everyone"
-    ON master_fields FOR SELECT
-    USING (true);
-
--- Authenticated users can insert
-CREATE POLICY "Authenticated users can insert master fields"
-    ON master_fields FOR INSERT
-    WITH CHECK (auth.role() = 'authenticated');
-
--- Authenticated users can update
-CREATE POLICY "Authenticated users can update master fields"
-    ON master_fields FOR UPDATE
-    USING (auth.role() = 'authenticated')
-    WITH CHECK (auth.role() = 'authenticated');
-
--- Authenticated users can delete
-CREATE POLICY "Authenticated users can delete master fields"
-    ON master_fields FOR DELETE
-    USING (auth.role() = 'authenticated');
-
--- =====================================================
--- PRODUCTS RLS POLICIES
--- =====================================================
-
--- Public can view active products (for ecommerce site)
-CREATE POLICY "Active products are viewable by everyone"
-    ON products FOR SELECT
-    USING (status = 'active' OR auth.role() = 'authenticated');
-
--- Authenticated users can insert
-CREATE POLICY "Authenticated users can insert products"
-    ON products FOR INSERT
-    WITH CHECK (auth.role() = 'authenticated');
-
--- Authenticated users can update
-CREATE POLICY "Authenticated users can update products"
-    ON products FOR UPDATE
-    USING (auth.role() = 'authenticated')
-    WITH CHECK (auth.role() = 'authenticated');
-
--- Authenticated users can delete
-CREATE POLICY "Authenticated users can delete products"
-    ON products FOR DELETE
-    USING (auth.role() = 'authenticated');
-
--- =====================================================
--- SEED DATA
--- =====================================================
-
--- Insert sample categories
-INSERT INTO categories (name, description, color, icon) VALUES
-    ('Die Springs', 'Compression springs used in die sets and molds', '#6366f1', '🔗'),
-    ('Ejector Pins', 'Pins used to eject parts from molds', '#ec4899', '📌');
-
--- Get the category IDs for reference
-DO $$
-DECLARE
-    cat_die_springs_id UUID;
-    cat_ejector_pins_id UUID;
-    master_size_id UUID;
-    master_load_id UUID;
-    master_length_id UUID;
-    master_material_id UUID;
-BEGIN
-    -- Get category IDs
-    SELECT id INTO cat_die_springs_id FROM categories WHERE name = 'Die Springs';
-    SELECT id INTO cat_ejector_pins_id FROM categories WHERE name = 'Ejector Pins';
-    
-    -- Insert sample masters
-    INSERT INTO masters (name, description, color, icon, category_id) VALUES
-        ('Size', 'Product size specification', '#6366f1', '📐', cat_die_springs_id)
-        RETURNING id INTO master_size_id;
-    
-    INSERT INTO masters (name, description, color, icon, category_id) VALUES
-        ('Load', 'Load capacity specification', '#f59e0b', '⚡', cat_die_springs_id)
-        RETURNING id INTO master_load_id;
-    
-    INSERT INTO masters (name, description, color, icon, category_id) VALUES
-        ('Length', 'Product length measurement', '#ec4899', '📏', cat_ejector_pins_id)
-        RETURNING id INTO master_length_id;
-    
-    INSERT INTO masters (name, description, color, icon, category_id) VALUES
-        ('Material', 'Material composition', '#10b981', '🔧', cat_ejector_pins_id)
-        RETURNING id INTO master_material_id;
-    
-    -- Insert sample master fields
-    INSERT INTO master_fields (master_id, label, type, options, unit, sort_order) VALUES
-        (master_size_id, 'Size', 'select', '["M6", "M8", "M10", "M12", "M16"]'::jsonb, NULL, 0),
-        (master_load_id, 'Load', 'select', '["Light", "Medium", "Heavy", "Extra Heavy"]'::jsonb, NULL, 0),
-        (master_length_id, 'Length', 'select', '["50mm", "75mm", "100mm", "150mm", "200mm"]'::jsonb, 'mm', 0),
-        (master_material_id, 'Material', 'select', '["SKD61", "SKH51", "Nitrided Steel", "Stainless Steel"]'::jsonb, NULL, 0);
-END $$;
-
--- =====================================================
--- HELPER FUNCTIONS
--- =====================================================
-
--- Function to get all masters for a category
-CREATE OR REPLACE FUNCTION get_category_masters(category_uuid UUID)
-RETURNS TABLE (
-    id UUID,
-    name TEXT,
-    description TEXT,
-    color TEXT,
-    icon TEXT,
-    fields JSONB
-) AS $$
-BEGIN
-    RETURN QUERY
-    SELECT 
-        m.id,
-        m.name,
-        m.description,
-        m.color,
-        m.icon,
-        jsonb_agg(
-            jsonb_build_object(
-                'id', mf.id,
-                'label', mf.label,
-                'type', mf.type,
-                'options', mf.options,
-                'unit', mf.unit
-            ) ORDER BY mf.sort_order
-        ) as fields
-    FROM masters m
-    LEFT JOIN master_fields mf ON m.id = mf.master_id
-    WHERE m.category_id = category_uuid
-    GROUP BY m.id, m.name, m.description, m.color, m.icon;
-END;
-$$ LANGUAGE plpgsql;
-
--- Function to search products
-CREATE OR REPLACE FUNCTION search_products(search_term TEXT, category_filter UUID DEFAULT NULL, status_filter TEXT DEFAULT 'active')
-RETURNS TABLE (
-    id UUID,
-    name TEXT,
-    sku TEXT,
-    description TEXT,
-    category_id UUID,
-    status TEXT,
-    master_values JSONB,
-    created_at TIMESTAMPTZ
-) AS $$
-BEGIN
-    RETURN QUERY
-    SELECT 
-        p.id,
-        p.name,
-        p.sku,
-        p.description,
-        p.category_id,
-        p.status,
-        p.master_values,
-        p.created_at
-    FROM products p
-    WHERE 
-        (search_term IS NULL OR search_term = '' OR 
-         p.name ILIKE '%' || search_term || '%' OR 
-         p.sku ILIKE '%' || search_term || '%')
-        AND (category_filter IS NULL OR p.category_id = category_filter)
-        AND (status_filter IS NULL OR p.status = status_filter)
-    ORDER BY p.created_at DESC;
-END;
-$$ LANGUAGE plpgsql;
-
--- =====================================================
--- COMMENTS FOR DOCUMENTATION
--- =====================================================
-
-COMMENT ON TABLE categories IS 'Product categories (e.g., Die Springs, Ejector Pins)';
-COMMENT ON TABLE masters IS 'Attribute types (e.g., Size, Length, Material) that can be linked to categories';
-COMMENT ON TABLE master_fields IS 'Specific fields for each master with their options';
-COMMENT ON TABLE products IS 'Actual products in the catalog';
-
-COMMENT ON COLUMN products.master_values IS 'JSONB object storing selected values for each master field. Format: {"field_id": ["value1", "value2"]}';
-COMMENT ON COLUMN products.status IS 'Product status: active (visible to public), inactive (hidden), draft (work in progress)';
+COMMENT ON TABLE categories IS 'Product categories';
+COMMENT ON TABLE masters IS 'Attribute types linked to categories';
+COMMENT ON TABLE master_fields IS 'Fields for each master';
+COMMENT ON TABLE master_values IS 'Individual values for master fields';
+COMMENT ON TABLE products IS 'Products in the catalog';
+COMMENT ON TABLE product_master_values IS 'Junction table linking products to master values';

@@ -7,6 +7,7 @@ import Image from "next/image";
 const STATUS_CONFIG = {
   active: { label: "Active", bg: "bg-emerald-100", text: "text-emerald-700", dot: "bg-emerald-500" },
   inactive: { label: "Inactive", bg: "bg-red-100", text: "text-red-600", dot: "bg-red-400" },
+  draft: { label: "Draft", bg: "bg-amber-100", text: "text-amber-700", dot: "bg-amber-500" },
 };
 
 interface ProductCardProps {
@@ -16,7 +17,7 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, category, onDelete }: ProductCardProps) {
-  const status = STATUS_CONFIG[product.status];
+  const status = STATUS_CONFIG[product.status] || STATUS_CONFIG.draft;
   const filledAttrs = Object.entries(product.masterValues).filter(([, v]) => v.length > 0);
 
   return (

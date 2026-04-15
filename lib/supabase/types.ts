@@ -110,8 +110,7 @@ export interface Database {
           sku: string
           description: string | null
           category_id: string
-          status: 'active' | 'inactive'
-          master_values: Json
+          status: 'active' | 'inactive' | 'draft'
           image_url: string | null
           created_at: string
           updated_at: string
@@ -122,8 +121,7 @@ export interface Database {
           sku: string
           description?: string | null
           category_id: string
-          status?: 'active' | 'inactive'
-          master_values?: Json
+          status?: 'active' | 'inactive' | 'draft'
           image_url?: string | null
           created_at?: string
           updated_at?: string
@@ -134,11 +132,47 @@ export interface Database {
           sku?: string
           description?: string | null
           category_id?: string
-          status?: 'active' | 'inactive'
-          master_values?: Json
+          status?: 'active' | 'inactive' | 'draft'
           image_url?: string | null
           created_at?: string
           updated_at?: string
+        }
+      }
+      master_values: {
+        Row: {
+          id: string
+          master_field_id: string
+          value: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          master_field_id: string
+          value: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          master_field_id?: string
+          value?: string
+          created_at?: string
+        }
+      }
+      product_master_values: {
+        Row: {
+          id: string
+          product_id: string
+          master_value_id: string
+        }
+        Insert: {
+          id?: string
+          product_id: string
+          master_value_id: string
+        }
+        Update: {
+          id?: string
+          product_id?: string
+          master_value_id?: string
         }
       }
     }
@@ -174,14 +208,29 @@ export interface Master {
   createdAt: string;
 }
 
+export interface MasterValue {
+  id: string;
+  masterFieldId: string;
+  value: string;
+  createdAt: string;
+}
+
+export interface ProductMasterValue {
+  id: string;
+  productId: string;
+  masterValueId: string;
+  masterValue?: MasterValue;
+}
+
 export interface Product {
   id: string;
   name: string;
   sku: string;
   description: string;
   categoryId: string;
-  status: 'active' | 'inactive';
-  masterValues: Record<string, string[]>;
+  status: 'active' | 'inactive' | 'draft';
+  masterValues: Record<string, string[]>; // For backward compatibility
+  masterValueIds?: string[]; // New: array of master_value IDs
   imageUrl?: string;
   createdAt: string;
 }
@@ -225,9 +274,18 @@ export interface CreateProductInput {
   sku: string;
   description?: string;
   categoryId: string;
-  status: 'active' | 'inactive';
-  masterValues: Record<string, string[]>;
+  status: 'active' | 'inactive' | 'draft';
+  masterValueIds: string[]; // Array of master_value IDs to link
   imageUrl?: string;
 }
 
 export interface UpdateProductInput extends Partial<CreateProductInput> {}
+
+export interface CreateMasterValueInput {
+  masterFieldId: string;
+  value: string;
+}
+
+export interface UpdateMasterValueInput {
+  value?: string;
+}

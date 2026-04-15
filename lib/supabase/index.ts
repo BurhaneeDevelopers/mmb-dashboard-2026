@@ -1,7 +1,7 @@
 // Export all services
 export { categoriesService } from './categories.service';
 export { mastersService } from './masters.service';
-export { productsService } from './products.service';
+export { productsService, masterValuesService } from './products.service';
 export { authService } from './auth.service';
 
 // Export client
