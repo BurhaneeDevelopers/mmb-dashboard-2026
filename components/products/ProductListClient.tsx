@@ -97,7 +97,7 @@ export function ProductListClient() {
           <NoResults onClear={handleClearFilters} />
         )
       ) : (
-        <div className="grid gap-3">
+        <div className="grid gap-2">
           {filtered.map((product) => {
             const category = masterCategories.find((c) => c.id === product.categoryId);
             return (
