@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, Upload } from "lucide-react";
 import Link from "next/link";
 import { useProducts, useMasters, useDeleteProduct } from "@/lib/hooks";
 import { ProductCard } from "./ProductCard";
 import { ProductFilters } from "./ProductFilters";
 import { EmptyState } from "./EmptyState";
 import { NoResults } from "./NoResults";
+import { BulkImportPopup } from "./BulkImportPopup";
 
 export function ProductListClient() {
   const { data: products = [], isLoading } = useProducts();
@@ -18,6 +19,7 @@ export function ProductListClient() {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterCategory, setFilterCategory] = useState<string>("all");
+  const [showImportPopup, setShowImportPopup] = useState(false);
 
   const filtered = products.filter((p) => {
     const matchSearch =
@@ -69,14 +71,24 @@ export function ProductListClient() {
             {products.length} product{products.length !== 1 ? "s" : ""} in your catalog
           </p>
         </div>
-        <Link
-          href="/products/new"
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md hover:shadow-lg transition-all"
-          style={{ background: "linear-gradient(135deg, #ec4899, #f43f5e)" }}
-        >
-          <PlusCircle className="w-4 h-4" />
-          Add Product
-        </Link>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowImportPopup(true)}
+            type="button"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border-2 border-pink-200 text-pink-600 hover:bg-pink-50 transition-all"
+          >
+            <Upload className="w-4 h-4" />
+            Bulk Import
+          </button>
+          <Link
+            href="/products/new"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md hover:shadow-lg transition-all"
+            style={{ background: "linear-gradient(135deg, #ec4899, #f43f5e)" }}
+          >
+            <PlusCircle className="w-4 h-4" />
+            Add Product
+          </Link>
+        </div>
       </div>
 
       <ProductFilters
@@ -111,6 +123,15 @@ export function ProductListClient() {
           })}
         </div>
       )}
+
+      <BulkImportPopup
+        open={showImportPopup}
+        onOpenChange={setShowImportPopup}
+        onComplete={() => {
+          // Optionally refetch products or show success message
+          toast.success("Import completed");
+        }}
+      />
     </div>
   );
 }

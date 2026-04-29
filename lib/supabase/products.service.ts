@@ -9,17 +9,22 @@ const transformProduct = (row: any): Product => {
   
   if (row.product_master_values && Array.isArray(row.product_master_values)) {
     row.product_master_values.forEach((pmv: any) => {
-      if (pmv.master_values) {
-        const fieldId = pmv.master_values.master_field_id;
-        const value = pmv.master_values.value;
-        const valueId = pmv.master_values.id;
+      // Handle both nested object and direct master_values reference
+      const masterValue = pmv.master_values;
+      
+      if (masterValue) {
+        const fieldId = masterValue.master_field_id;
+        const value = masterValue.value;
+        const valueId = masterValue.id;
         
-        masterValueIds.push(valueId);
-        
-        if (!masterValues[fieldId]) {
-          masterValues[fieldId] = [];
+        if (fieldId && value && valueId) {
+          masterValueIds.push(valueId);
+          
+          if (!masterValues[fieldId]) {
+            masterValues[fieldId] = [];
+          }
+          masterValues[fieldId].push(value);
         }
-        masterValues[fieldId].push(value);
       }
     });
   }
