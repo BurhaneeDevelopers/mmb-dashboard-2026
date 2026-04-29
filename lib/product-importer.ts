@@ -28,113 +28,119 @@ export async function importProduct(
         continue;
       }
 
-      // Check if master exists in this category
-      const { data: existingMaster } = await supabase
-        .from('masters')
-        .select('id')
-        .eq('name', master.name)
-        .eq('category_id', categoryId)
-        .maybeSingle();
-
-      let masterId: string;
-      let fieldId: string;
-
-      if (!existingMaster) {
-        // Create master + field
-        const { data: newMaster, error: masterError } = await supabase
+      try {
+        // Check if master exists in this category (case-insensitive)
+        const { data: existingMaster } = await supabase
           .from('masters')
-          .insert({
-            name: master.name,
-            description: master.label || master.name,
-            color: randomColor(),
-            icon: inferIcon(master.name),
-            category_id: categoryId,
-          })
           .select('id')
-          .single();
-
-        if (masterError || !newMaster) {
-          console.error('Failed to create master:', masterError);
-          continue;
-        }
-
-        masterId = newMaster.id;
-
-        const { data: newField, error: fieldError } = await supabase
-          .from('master_fields')
-          .insert({
-            master_id: masterId,
-            label: master.label || master.name,
-            type: master.type || 'select',
-            unit: master.unit || null,
-            sort_order: 0,
-          })
-          .select('id')
-          .single();
-
-        if (fieldError || !newField) {
-          console.error('Failed to create field:', fieldError);
-          continue;
-        }
-
-        fieldId = newField.id;
-      } else {
-        masterId = existingMaster.id;
-
-        // Get field
-        const { data: field } = await supabase
-          .from('master_fields')
-          .select('id')
-          .eq('master_id', masterId)
+          .ilike('name', master.name)
+          .eq('category_id', categoryId)
           .maybeSingle();
 
-        if (!field) {
-          console.error('No field found for master:', masterId);
-          continue;
-        }
+        let masterId: string;
+        let fieldId: string;
 
-        fieldId = field.id;
-      }
-
-      // Step 2: For each value, upsert master_value
-      const valueIds: string[] = [];
-
-      for (const value of master.values) {
-        if (!value || !value.trim()) {
-          continue;
-        }
-
-        const trimmedValue = value.trim();
-
-        const { data: existing } = await supabase
-          .from('master_values')
-          .select('id')
-          .eq('master_field_id', fieldId)
-          .eq('value', trimmedValue)
-          .maybeSingle();
-
-        if (existing) {
-          valueIds.push(existing.id);
-        } else {
-          const { data: newVal, error: valueError } = await supabase
-            .from('master_values')
+        if (!existingMaster) {
+          // Create master + field
+          const { data: newMaster, error: masterError } = await supabase
+            .from('masters')
             .insert({
-              master_field_id: fieldId,
-              value: trimmedValue,
+              name: master.name.slice(0, 100),
+              description: (master.label || master.name).slice(0, 100),
+              color: randomColor(),
+              icon: inferIcon(master.name),
+              category_id: categoryId,
             })
             .select('id')
             .single();
 
-          if (valueError || !newVal) {
-            console.error('Failed to create value:', valueError);
+          if (masterError || !newMaster) {
+            console.error('Failed to create master:', masterError);
             continue;
           }
 
-          valueIds.push(newVal.id);
-        }
-      }
+          masterId = newMaster.id;
 
-      allValueIds.push(...valueIds);
+          const { data: newField, error: fieldError } = await supabase
+            .from('master_fields')
+            .insert({
+              master_id: masterId,
+              label: (master.label || master.name).slice(0, 100),
+              type: master.type || 'select',
+              unit: master.unit || null,
+              sort_order: 0,
+            })
+            .select('id')
+            .single();
+
+          if (fieldError || !newField) {
+            console.error('Failed to create field:', fieldError);
+            continue;
+          }
+
+          fieldId = newField.id;
+        } else {
+          masterId = existingMaster.id;
+
+          // Get field
+          const { data: field } = await supabase
+            .from('master_fields')
+            .select('id')
+            .eq('master_id', masterId)
+            .maybeSingle();
+
+          if (!field) {
+            console.error('No field found for master:', masterId);
+            continue;
+          }
+
+          fieldId = field.id;
+        }
+
+        // NULL GUARD — never proceed without fieldId
+        if (!fieldId) {
+          console.error('No fieldId available for master:', master.name);
+          continue;
+        }
+
+        // Step 2: For each value, upsert master_value
+        for (const value of master.values) {
+          const trimmedValue = String(value ?? '').trim();
+          if (!trimmedValue) {
+            continue;
+          }
+
+          const { data: existing } = await supabase
+            .from('master_values')
+            .select('id')
+            .eq('master_field_id', fieldId)
+            .eq('value', trimmedValue)
+            .maybeSingle();
+
+          if (existing) {
+            allValueIds.push(existing.id);
+          } else {
+            const { data: newVal, error: valueError } = await supabase
+              .from('master_values')
+              .insert({
+                master_field_id: fieldId,
+                value: trimmedValue,
+              })
+              .select('id')
+              .single();
+
+            if (valueError || !newVal) {
+              console.error('Failed to create value:', trimmedValue, valueError);
+              continue;
+            }
+
+            allValueIds.push(newVal.id);
+          }
+        }
+      } catch (masterErr) {
+        console.error('Master processing error:', master.name, masterErr);
+        continue; // never let one master crash the whole product
+      }
     }
 
     // Step 3: Create product
@@ -143,9 +149,9 @@ export async function importProduct(
     const { data: newProduct, error: productError } = await supabase
       .from('products')
       .insert({
-        name: product.name,
+        name: product.name.slice(0, 200),
         sku,
-        description: product.name,
+        description: product.name.slice(0, 200),
         category_id: categoryId,
         status: 'active',
       })
@@ -161,8 +167,11 @@ export async function importProduct(
     }
 
     // Step 4: Link ALL master values to product
-    if (allValueIds.length > 0) {
-      const pmvInserts = allValueIds.map(vid => ({
+    // FIX: Deduplicate valueIds before linking — prevents unique constraint violation
+    const uniqueValueIds = [...new Set(allValueIds)];
+    
+    if (uniqueValueIds.length > 0) {
+      const pmvInserts = uniqueValueIds.map(vid => ({
         product_id: newProduct.id,
         master_value_id: vid,
       }));

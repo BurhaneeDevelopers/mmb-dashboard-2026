@@ -75,7 +75,6 @@ export async function parseCatalogueImage(
 
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({
-    // Use the '-preview' suffix for Gemini 3.1 models in v1beta
     model: 'gemini-3.1-flash-lite-preview',
     generationConfig: {
       responseMimeType: 'application/json',
