@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, DragEvent } from "react";
-import { Upload, X, CheckCircle2, AlertCircle, Loader2, ChevronRight } from "lucide-react";
+import { Upload, X, CheckCircle2, AlertCircle, Loader2, ChevronRight, Clipboard } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -13,6 +13,7 @@ interface ProcessResult {
   productId?: string;
   productName?: string;
   error?: string;
+  imageUploaded?: boolean;
 }
 
 interface ApiSummary {
@@ -67,6 +68,32 @@ export function BulkImportPopup({ open, onOpenChange, onComplete }: BulkImportPo
       setPreviewUrls(prev2 => ({ ...prev2, ...newPreviews }));
       return updated;
     });
+  };
+
+  // Handle paste from clipboard
+  const handlePaste = async () => {
+    try {
+      const clipboardItems = await navigator.clipboard.read();
+      const imageFiles: File[] = [];
+      
+      for (const clipboardItem of clipboardItems) {
+        for (const type of clipboardItem.types) {
+          if (type.startsWith('image/')) {
+            const blob = await clipboardItem.getType(type);
+            const file = new File([blob], `pasted-image-${Date.now()}.${type.split('/')[1]}`, { type });
+            imageFiles.push(file);
+          }
+        }
+      }
+      
+      if (imageFiles.length > 0) {
+        addFiles(imageFiles);
+      } else {
+        setError("No images found in clipboard");
+      }
+    } catch (err) {
+      setError("Failed to paste from clipboard. Please ensure you have copied an image.");
+    }
   };
 
   const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
@@ -243,6 +270,25 @@ export function BulkImportPopup({ open, onOpenChange, onComplete }: BulkImportPo
                   : "Click to select or drag & drop PNG/JPEG images"}
               </p>
               <p className="text-xs text-muted-foreground mt-1">Maximum 4 images</p>
+              
+              {/* Paste button */}
+              {files.length < 4 && (
+                <div className="mt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handlePaste();
+                    }}
+                    className="text-xs"
+                  >
+                    <Clipboard className="w-3 h-3 mr-1" />
+                    Paste from Clipboard
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* File previews */}
@@ -380,6 +426,7 @@ export function BulkImportPopup({ open, onOpenChange, onComplete }: BulkImportPo
                             )}
                             <span className={product.success ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}>
                               {product.productName || "Unknown"}
+                              {product.success && product.imageUploaded && " (image uploaded)"}
                               {!product.success && product.error && ` - ${product.error}`}
                             </span>
                           </div>

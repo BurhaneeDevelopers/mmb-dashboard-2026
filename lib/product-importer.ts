@@ -42,11 +42,17 @@ export async function importProduct(
 
         if (!existingMaster) {
           // Create master + field
+          // Ensure description meets minimum length requirement (5 chars)
+          const rawDescription = master.label || master.name;
+          const description = rawDescription.length >= 5 
+            ? rawDescription.slice(0, 500) 
+            : `${rawDescription} specification`.slice(0, 500);
+          
           const { data: newMaster, error: masterError } = await supabase
             .from('masters')
             .insert({
               name: master.name.slice(0, 100),
-              description: (master.label || master.name).slice(0, 100),
+              description,
               color: randomColor(),
               icon: inferIcon(master.name),
               category_id: categoryId,
