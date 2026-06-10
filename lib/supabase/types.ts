@@ -187,6 +187,8 @@ export interface Category {
   color: string;
   icon: string;
   createdAt: string;
+  parentId?: string | null;
+  isMain: boolean;
 }
 
 export interface MasterField {
@@ -241,6 +243,8 @@ export interface CreateCategoryInput {
   description: string;
   color: string;
   icon: string;
+  parentId?: string | null;
+  isMain: boolean;
 }
 
 export interface UpdateCategoryInput extends Partial<CreateCategoryInput> {}

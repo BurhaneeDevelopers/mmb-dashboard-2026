@@ -9,6 +9,8 @@ const transformCategory = (row: any): Category => ({
   color: row.color,
   icon: row.icon,
   createdAt: row.created_at,
+  parentId: row.parent_id,
+  isMain: row.is_main ?? true,
 });
 
 export const categoriesService = {
@@ -33,6 +35,30 @@ export const categoriesService = {
 
     if (error) throw error;
     return transformCategory(data);
+  },
+
+  // Get main categories only
+  async getMainCategories(): Promise<Category[]> {
+    const { data, error } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('is_main', true)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data.map(transformCategory);
+  },
+
+  // Get subcategories for a parent
+  async getSubCategories(parentId: string): Promise<Category[]> {
+    const { data, error } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('parent_id', parentId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data.map(transformCategory);
   },
 
   // Get category with masters count
@@ -61,6 +87,8 @@ export const categoriesService = {
         description: input.description,
         color: input.color,
         icon: input.icon,
+        parent_id: input.parentId,
+        is_main: input.isMain,
       })
       .select()
       .single();
@@ -78,6 +106,8 @@ export const categoriesService = {
         description: input.description,
         color: input.color,
         icon: input.icon,
+        parent_id: input.parentId,
+        is_main: input.isMain,
       })
       .eq('id', id)
       .select()

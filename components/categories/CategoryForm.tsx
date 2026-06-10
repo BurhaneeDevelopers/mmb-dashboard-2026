@@ -4,16 +4,19 @@ import { useFormik } from "formik";
 import * as Yup from "yup";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ChevronRight, Sparkles, Info, FolderPlus } from "lucide-react";
+import { ChevronRight, Sparkles, Info, FolderPlus, CheckCircle2 } from "lucide-react";
 import { useCategories, useCreateCategory, useUpdateCategory } from "@/lib/hooks";
 import { CATEGORY_COLORS, CATEGORY_ICONS } from "@/lib/store";
 import { cn } from "@/lib/utils";
+import type { Category } from "@/lib/supabase/types";
 
 type FormData = {
   name: string;
   description: string;
   color: string;
   icon: string;
+  parentId: string;
+  isMain: boolean;
 };
 
 interface CategoryFormProps {
@@ -33,6 +36,11 @@ const validationSchema = Yup.object({
     .max(200, "Max 200 characters"),
   color: Yup.string().required("Pick a color"),
   icon: Yup.string().required("Pick an icon"),
+  parentId: Yup.string().when("isMain", {
+    is: false,
+    then: schema => schema.required("Please select a parent category"),
+    otherwise: schema => schema,
+  }),
 });
 
 export function CategoryForm({ mode, initialData, categoryId }: CategoryFormProps) {
@@ -41,12 +49,16 @@ export function CategoryForm({ mode, initialData, categoryId }: CategoryFormProp
   const updateMutation = useUpdateCategory();
   const router = useRouter();
 
+  const mainCategories = categories.filter(cat => cat.isMain);
+
   const formik = useFormik<FormData>({
     initialValues: initialData ?? {
       name: "",
       description: "",
       color: CATEGORY_COLORS[0],
       icon: CATEGORY_ICONS[0],
+      parentId: "",
+      isMain: true,
     },
     validationSchema,
     onSubmit: async (values: FormData) => {
@@ -112,9 +124,8 @@ export function CategoryForm({ mode, initialData, categoryId }: CategoryFormProp
         <div>
           <p className="text-sm font-semibold text-blue-800">What is a Category?</p>
           <p className="text-xs text-blue-700 mt-0.5 leading-relaxed">
-            Categories are top-level groups for your masters — for example, <strong>&quot;Springs&quot;</strong> can
-            contain masters like &quot;Die Springs&quot; and &quot;Compression Springs&quot;.
-            Think of them as folders that keep your catalog organised.
+            Categories are groups for your masters — main categories can have subcategories for better organisation.
+            For example, <strong>&quot;Springs&quot;</strong> can contain subcategories like &quot;Die Springs&quot; and &quot;Compression Springs&quot;.
           </p>
         </div>
       </div>
@@ -133,7 +144,7 @@ export function CategoryForm({ mode, initialData, categoryId }: CategoryFormProp
       )}
 
       <form onSubmit={formik.handleSubmit} className="space-y-5">
-        {/* Name */}
+        {/* Category Details */}
         <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm space-y-5">
           <div className="flex items-center gap-2 pb-1 border-b border-slate-100">
             <FolderPlus className="w-4 h-4 text-indigo-400" />
@@ -158,6 +169,82 @@ export function CategoryForm({ mode, initialData, categoryId }: CategoryFormProp
               </p>
             )}
           </div>
+
+          {/* Category Type */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Category Type</label>
+            <div className="flex gap-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="isMain"
+                  checked={formik.values.isMain}
+                  onChange={() => {
+                    formik.setFieldValue("isMain", true);
+                    formik.setFieldValue("parentId", "");
+                  }}
+                  className="w-4 h-4 text-indigo-600"
+                />
+                <span className="text-sm text-slate-700">Main Category</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="isMain"
+                  checked={!formik.values.isMain}
+                  onChange={() => formik.setFieldValue("isMain", false)}
+                  className="w-4 h-4 text-indigo-600"
+                />
+                <span className="text-sm text-slate-700">Subcategory</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Parent Category */}
+          {!formik.values.isMain && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                Parent Category <span className="text-red-500">*</span>
+              </label>
+              <div className="space-y-2">
+                {mainCategories.map(cat => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => formik.setFieldValue("parentId", cat.id)}
+                    className={cn(
+                      'w-full p-3 rounded-lg border-2 text-left transition-all flex items-center gap-2',
+                      formik.values.parentId === cat.id
+                        ? 'border-transparent shadow-md'
+                        : 'border-slate-200 hover:border-slate-300 bg-white'
+                    )}
+                    style={
+                      formik.values.parentId === cat.id
+                        ? { background: `${cat.color}12`, borderColor: cat.color }
+                        : {}
+                    }
+                  >
+                    <span className="text-lg">{cat.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-slate-800">{cat.name}</p>
+                      <p className="text-[11px] text-slate-400 line-clamp-1">{cat.description}</p>
+                    </div>
+                    {formik.values.parentId === cat.id && (
+                      <CheckCircle2
+                        className="w-4 h-4 shrink-0"
+                        style={{ color: cat.color }}
+                      />
+                    )}
+                  </button>
+                ))}
+              </div>
+              {formik.touched.parentId && formik.errors.parentId && (
+                <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                  <span>⚠</span> {formik.errors.parentId}
+                </p>
+              )}
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">
