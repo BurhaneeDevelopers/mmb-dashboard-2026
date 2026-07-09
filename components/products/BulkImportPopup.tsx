@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Upload, X, CheckCircle2, AlertCircle, Loader2, Clipboard, Image as ImageIcon } from 'lucide-react';
+import { Upload, X, CheckCircle2, AlertCircle, Loader2, ChevronRight, Clipboard, Image as ImageIcon, FolderPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -12,12 +12,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useCategories } from '@/lib/hooks';
-import { QuickCategoryDialog } from '../categories/QuickCategoryDialog';
-import { CategoryDropdown } from '../categories/CategoryDropdown';
+import { categoriesService } from '@/lib/supabase/categories.service';
+import { QuickCategoryDialog } from '@/components/categories/QuickCategoryDialog';
 
 interface BulkImportPopupProps {
   open: boolean;
@@ -51,6 +58,8 @@ export function BulkImportPopup({ open, onOpenChange, onComplete }: BulkImportPo
   const [files, setFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
   const [categoryId, setCategoryId] = useState('');
+  const [mainCategoryId, setMainCategoryId] = useState('');
+  const [subCategories, setSubCategories] = useState<any[]>([]);
   const [results, setResults] = useState<ProcessResult[]>([]);
   const [summary, setSummary] = useState<ApiSummary | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -60,6 +69,25 @@ export function BulkImportPopup({ open, onOpenChange, onComplete }: BulkImportPo
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: allCategories = [], refetch: refetchCategories } = useCategories();
+  
+  // Filter main categories (isMain: true, no parentId)
+  const mainCategories = allCategories.filter(cat => cat.isMain && !cat.parentId);
+
+  // Load subcategories when main category is selected
+  useEffect(() => {
+    if (mainCategoryId) {
+      // Always set main category as the final selection immediately
+      setCategoryId(mainCategoryId);
+      
+      // Load subcategories in the background (optional selection)
+      categoriesService.getSubCategories(mainCategoryId).then(subs => {
+        setSubCategories(subs);
+      });
+    } else {
+      setSubCategories([]);
+      setCategoryId('');
+    }
+  }, [mainCategoryId]);
 
   // Cleanup preview URLs
   const cleanupPreviews = useCallback(() => {
@@ -243,6 +271,8 @@ export function BulkImportPopup({ open, onOpenChange, onComplete }: BulkImportPo
     cleanupPreviews();
     setFiles([]);
     setCategoryId('');
+    setMainCategoryId('');
+    setSubCategories([]);
     setResults([]);
     setSummary(null);
     setStep('upload');
@@ -258,13 +288,37 @@ export function BulkImportPopup({ open, onOpenChange, onComplete }: BulkImportPo
     setSummary(null);
     setStep('upload');
     setError(null);
+    // Keep categoryId, mainCategoryId, subCategories
     toast.success('Category selections preserved. Add more images to continue.');
   };
 
   // Handle category created from quick dialog
   const handleCategoryCreated = async (newCategoryId: string) => {
-    await refetchCategories();
-    setCategoryId(newCategoryId);
+    // Refetch categories to get the latest list
+    const { data: updatedCategories } = await refetchCategories();
+    
+    if (updatedCategories) {
+      // Find the newly created category
+      const newCategory = updatedCategories.find(c => c.id === newCategoryId);
+      
+      if (newCategory) {
+        // Set it as the selected category
+        if (newCategory.isMain && !newCategory.parentId) {
+          // It's a main category
+          setMainCategoryId(newCategoryId);
+          setCategoryId(newCategoryId);
+        } else if (newCategory.parentId) {
+          // It's a subcategory, need to set parent first
+          const parent = updatedCategories.find(c => c.id === newCategory.parentId);
+          if (parent?.isMain && !parent.parentId) {
+            setMainCategoryId(parent.id);
+            setCategoryId(newCategoryId);
+          }
+        }
+        
+        toast.success(`Category "${newCategory.name}" selected`);
+      }
+    }
   };
 
   // Group results by filename
@@ -278,7 +332,7 @@ export function BulkImportPopup({ open, onOpenChange, onComplete }: BulkImportPo
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col bg-white">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col bg-white">
         <DialogHeader>
           <DialogTitle>
             Bulk Import Products from Images
@@ -293,17 +347,97 @@ export function BulkImportPopup({ open, onOpenChange, onComplete }: BulkImportPo
             <>
               {/* Category Selection */}
               <div className="space-y-4">
-                <div>
-                  <Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="main-category-select">
                     Select Category <span className="text-red-500">*</span>
                   </Label>
-                  <CategoryDropdown
-                    categories={allCategories}
-                    value={categoryId}
-                    onChange={setCategoryId}
-                    showQuickCreate
-                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowQuickCategoryDialog(true)}
+                    className="gap-1.5 text-xs h-8"
+                  >
+                    <FolderPlus className="w-3.5 h-3.5" />
+                    Quick Create
+                  </Button>
                 </div>
+                
+                {/* Main Category Selection */}
+                <div className="space-y-2">
+                  <Select value={mainCategoryId} onValueChange={setMainCategoryId}>
+                    <SelectTrigger id="main-category-select">
+                      <SelectValue placeholder="Choose a main category..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {mainCategories.map((category) => (
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.icon} {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {mainCategories.length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      No main categories available. Please create a category first.
+                    </p>
+                  )}
+                </div>
+
+                {/* Subcategory Selection */}
+                {subCategories.length > 0 && (
+                  <div className="space-y-2">
+                    <Label htmlFor="sub-category-select">
+                      Select Subcategory <span className="text-muted-foreground text-xs font-normal">(Optional)</span>
+                    </Label>
+                    <Select 
+                      value={categoryId} 
+                      onValueChange={(value) => {
+                        setCategoryId(value);
+                      }}
+                    >
+                      <SelectTrigger id="sub-category-select">
+                        <SelectValue placeholder="Choose a subcategory or use main category..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={mainCategoryId}>
+                          <span className="flex items-center gap-2">
+                            {mainCategories.find(c => c.id === mainCategoryId)?.icon}
+                            {mainCategories.find(c => c.id === mainCategoryId)?.name}
+                            <span className="text-xs text-muted-foreground">(Main Category)</span>
+                          </span>
+                        </SelectItem>
+                        {subCategories.map((category) => (
+                          <SelectItem key={category.id} value={category.id}>
+                            {category.icon} {category.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Products will be created in: <span className="font-medium">
+                        {categoryId === mainCategoryId 
+                          ? mainCategories.find(c => c.id === mainCategoryId)?.name
+                          : subCategories.find(c => c.id === categoryId)?.name
+                        }
+                      </span>
+                    </p>
+                  </div>
+                )}
+
+                {/* Show selected category path - only if subcategory is selected */}
+                {categoryId && categoryId !== mainCategoryId && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                    <p className="text-xs font-medium text-green-800">
+                      Selected Category Path:
+                    </p>
+                    <div className="flex items-center gap-2 mt-1 text-sm text-green-700">
+                      {mainCategories.find(c => c.id === mainCategoryId)?.name}
+                      <ChevronRight className="w-3 h-3" />
+                      {subCategories.find(c => c.id === categoryId)?.name}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Upload Area */}
@@ -584,6 +718,7 @@ export function BulkImportPopup({ open, onOpenChange, onComplete }: BulkImportPo
                   </>
                 ) : (
                   <>
+                    <ChevronRight className="w-4 h-4" />
                     Process & Import
                   </>
                 )}
