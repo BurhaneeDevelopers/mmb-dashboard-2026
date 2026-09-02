@@ -93,6 +93,7 @@ export function DraftProductCard({ product, onChange, duplicateSkus }: DraftProd
       {expanded && product.include && (
         <div className="border-t border-slate-100">
           {/* Which columns become masters */}
+          {product.masters.length > 0 && (
           <div className="border-b border-slate-100 px-4 py-3">
             <p className="mb-2 text-xs font-medium text-slate-500">
               Specification columns read from the page
@@ -118,6 +119,7 @@ export function DraftProductCard({ product, onChange, duplicateSkus }: DraftProd
               ))}
             </div>
           </div>
+          )}
 
           {/* The rows, as a table */}
           <div className="overflow-x-auto">

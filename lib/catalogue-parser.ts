@@ -81,6 +81,66 @@ UNIT RULES for each column:
 Accuracy of the model codes and of the row-to-value pairing matters more than
 anything else. Re-read each row before returning it.`;
 
+/**
+ * Used when the caller only wants the product's identity, not its full
+ * specification table (e.g. a quick add where nobody wants a master created
+ * for every column on the page).
+ */
+const SKU_ONLY_PROMPT = `You are reading one page of an industrial product catalogue.
+
+Extract only the product identity: the product name and the model / part
+number / SKU code of every variant. Ignore every specification, dimension,
+weight or other attribute column entirely - do not read or record any values
+from those columns, only the model code itself.
+
+STRUCTURE
+- The page heading is the product name (e.g. "MOULD CLAMP").
+- A page can contain SEVERAL products, each with its own main heading. Those
+  are separate products.
+- A product can have SEVERAL tables under sub-headings
+  (e.g. "MOULD CLAMP - WITH CLAMPING STUD" and "MOULD CLAMP WITH T BOLT").
+  Those are the SAME product. Put both tables in that product's "tables"
+  array and record each sub-heading in "tableTitle".
+- The first column is almost always the MODEL / PART NO / CODE column.
+  Record its header in "modelColumn".
+- Every table ROW is one variant. Extract EVERY row, in printed order, even
+  when codes look similar. Do not merge, summarise, deduplicate or skip rows.
+- Give each row its model code verbatim as printed, including letter
+  suffixes (RMC-12, RMC-12A, RMC-12B). Do not correct, renumber or reformat
+  the code.
+
+IGNORE
+Every specification column and its values, company name, logo, address,
+phone, email, website, page numbers, footnotes, ordering examples, technical
+drawings and diagrams, stock symbols. Descriptive paragraphs are context, not
+data.
+
+Return exactly this JSON shape:
+{
+  "products": [
+    {
+      "name": "MOULD CLAMP",
+      "description": "one sentence from the page describing the product, or null",
+      "tables": [
+        {
+          "tableTitle": "MOULD CLAMP - WITH CLAMPING STUD",
+          "modelColumn": "MODEL",
+          "rows": [
+            { "model": "RMC-12" },
+            { "model": "RMC-12A" }
+          ]
+        }
+      ]
+    }
+  ]
+}
+
+Do not include a "columns" array or a "specifications" object - only the
+model code for each row. Accuracy of the model codes matters more than
+anything else. Re-read each row before returning it.`;
+
+export type CatalogueScanMode = 'full' | 'skuOnly';
+
 export interface ParsedColumn {
   header: string;
   unit: string | null;
@@ -153,7 +213,7 @@ function inferUnit(header: string): string | null {
  * array turned into silently wrong products. Everything questionable is either
  * repaired here or reported as a warning for the review screen.
  */
-function normalizeParseResult(raw: any): ParseResult {
+function normalizeParseResult(raw: any, mode: CatalogueScanMode = 'full'): ParseResult {
   const warnings: string[] = [];
   const products: ParsedProduct[] = [];
 
@@ -182,23 +242,26 @@ function normalizeParseResult(raw: any): ParseResult {
       const modelColumn = cleanCell(rawTable?.modelColumn) ?? 'MODEL';
 
       // Column list, rebuilt from the rows so a header the model listed but
-      // never used cannot create an empty master.
+      // never used cannot create an empty master. Skipped entirely in
+      // sku-only mode, where no specification columns are wanted.
       const headerSet = new Set<string>();
-      for (const rawRow of rawRows) {
-        const specs = rawRow?.specifications;
-        if (specs && typeof specs === 'object') {
-          Object.keys(specs).forEach((key) => {
-            const header = key.trim();
-            // A model column echoed into the specs is not a specification.
-            if (header && header !== modelColumn && !MODEL_HEADER_PATTERN.test(header)) {
-              headerSet.add(header);
-            }
-          });
+      if (mode === 'full') {
+        for (const rawRow of rawRows) {
+          const specs = rawRow?.specifications;
+          if (specs && typeof specs === 'object') {
+            Object.keys(specs).forEach((key) => {
+              const header = key.trim();
+              // A model column echoed into the specs is not a specification.
+              if (header && header !== modelColumn && !MODEL_HEADER_PATTERN.test(header)) {
+                headerSet.add(header);
+              }
+            });
+          }
         }
       }
 
       const declaredUnits = new Map<string, string | null>();
-      if (Array.isArray(rawTable?.columns)) {
+      if (mode === 'full' && Array.isArray(rawTable?.columns)) {
         for (const col of rawTable.columns) {
           const header = cleanCell(col?.header);
           if (header) declaredUnits.set(header, cleanCell(col?.unit));
@@ -210,7 +273,7 @@ function normalizeParseResult(raw: any): ParseResult {
         unit: declaredUnits.get(header) ?? inferUnit(header),
       }));
 
-      if (columns.length === 0) {
+      if (mode === 'full' && columns.length === 0) {
         warnings.push(`"${name}": a table had model codes but no specification columns.`);
         continue;
       }
@@ -239,10 +302,12 @@ function normalizeParseResult(raw: any): ParseResult {
           specifications[col.header] = cleanCell(rawRow?.specifications?.[col.header]);
         }
 
-        const filled = Object.values(specifications).filter((v) => v !== null).length;
-        if (filled === 0) {
-          warnings.push(`"${name}": model "${model}" had no readable specification values.`);
-          continue;
+        if (mode === 'full') {
+          const filled = Object.values(specifications).filter((v) => v !== null).length;
+          if (filled === 0) {
+            warnings.push(`"${name}": model "${model}" had no readable specification values.`);
+            continue;
+          }
         }
 
         rows.push({ model, specifications });
@@ -276,7 +341,10 @@ function normalizeParseResult(raw: any): ParseResult {
   return { products, warnings };
 }
 
-export async function parseCatalogueImage(file: File): Promise<ParseResult> {
+export async function parseCatalogueImage(
+  file: File,
+  mode: CatalogueScanMode = 'full'
+): Promise<ParseResult> {
   const startTime = Date.now();
 
   if (!process.env.GEMINI_API_KEY) {
@@ -287,7 +355,9 @@ export async function parseCatalogueImage(file: File): Promise<ParseResult> {
   const base64 = Buffer.from(bytes).toString('base64');
   const mimeType = file.type || 'image/png';
 
-  console.log(`[catalogue-parser] Parsing ${file.name} (${(file.size / 1024).toFixed(2)} KB)`);
+  console.log(
+    `[catalogue-parser] Parsing ${file.name} (${(file.size / 1024).toFixed(2)} KB) in ${mode} mode`
+  );
 
   const model = genAI.getGenerativeModel({
     model: 'gemini-3.1-flash-lite-preview',
@@ -302,7 +372,7 @@ export async function parseCatalogueImage(file: File): Promise<ParseResult> {
   try {
     const result = await model.generateContent([
       { inlineData: { mimeType, data: base64 } },
-      CATALOGUE_PROMPT,
+      mode === 'skuOnly' ? SKU_ONLY_PROMPT : CATALOGUE_PROMPT,
     ]);
     text = result.response.text();
   } catch (error) {
@@ -324,7 +394,7 @@ export async function parseCatalogueImage(file: File): Promise<ParseResult> {
     );
   }
 
-  const parsed = normalizeParseResult(raw);
+  const parsed = normalizeParseResult(raw, mode);
   const rowCount = parsed.products.reduce(
     (sum, p) => sum + p.tables.reduce((s, t) => s + t.rows.length, 0),
     0

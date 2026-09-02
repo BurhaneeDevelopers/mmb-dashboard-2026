@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { parseCatalogueImage, type ParseResult } from '@/lib/catalogue-parser';
+import { parseCatalogueImage, type CatalogueScanMode, type ParseResult } from '@/lib/catalogue-parser';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const images = formData.getAll('images').filter((f): f is File => f instanceof File);
+    const mode: CatalogueScanMode = formData.get('mode') === 'skuOnly' ? 'skuOnly' : 'full';
 
     if (images.length === 0) {
       return NextResponse.json({ error: 'At least one image is required' }, { status: 400 });
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
     const scans: ScanResponseItem[] = await Promise.all(
       images.map(async (image) => {
         try {
-          const result = await parseCatalogueImage(image);
+          const result = await parseCatalogueImage(image, mode);
           return { filename: image.name, success: true, result };
         } catch (error) {
           console.error(`[letterhead-process] ${image.name} failed:`, error);

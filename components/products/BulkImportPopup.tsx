@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   Upload, X, CheckCircle2, AlertCircle, AlertTriangle, Loader2,
-  ChevronRight, ChevronLeft, Clipboard, Image as ImageIcon, FolderPlus,
+  ChevronRight, ChevronLeft, Clipboard, Image as ImageIcon, FolderPlus, Tag,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -63,6 +63,7 @@ export function BulkImportPopup({ open, onOpenChange, onComplete }: BulkImportPo
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
   const [categoryId, setCategoryId] = useState('');
   const [mainCategoryId, setMainCategoryId] = useState('');
+  const [skuOnly, setSkuOnly] = useState(false);
   const [subCategories, setSubCategories] = useState<Category[]>([]);
   const [draft, setDraft] = useState<CatalogueDraft | null>(null);
   const [results, setResults] = useState<ImportResult[]>([]);
@@ -208,6 +209,7 @@ export function BulkImportPopup({ open, onOpenChange, onComplete }: BulkImportPo
     try {
       const formData = new FormData();
       files.forEach((file) => formData.append('images', file));
+      if (skuOnly) formData.append('mode', 'skuOnly');
 
       const res = await fetch('/api/letterhead-process', { method: 'POST', body: formData });
       const contentType = res.headers.get('content-type');
@@ -357,6 +359,7 @@ export function BulkImportPopup({ open, onOpenChange, onComplete }: BulkImportPo
     setCategoryId('');
     setMainCategoryId('');
     setSubCategories([]);
+    setSkuOnly(false);
     onOpenChange(false);
   };
 
@@ -490,6 +493,44 @@ export function BulkImportPopup({ open, onOpenChange, onComplete }: BulkImportPo
                   </div>
                 )}
               </div>
+
+              <button
+                type="button"
+                onClick={() => setSkuOnly((current) => !current)}
+                className={cn(
+                  'flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-colors',
+                  skuOnly ? 'border-pink-300 bg-pink-50' : 'border-slate-200 hover:border-slate-300'
+                )}
+              >
+                <div
+                  className={cn(
+                    'mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
+                    skuOnly ? 'bg-pink-100 text-pink-600' : 'bg-slate-100 text-slate-400'
+                  )}
+                >
+                  <Tag className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-slate-700">
+                      Just read the model / part number
+                    </p>
+                    <span
+                      className={cn(
+                        'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2',
+                        skuOnly ? 'border-pink-500 bg-pink-500' : 'border-slate-300'
+                      )}
+                    >
+                      {skuOnly && <CheckCircle2 className="h-3.5 w-3.5 text-white" />}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Skips every specification column, so no new specifications
+                    are created and only the SKU is imported. Use this for
+                    pages where the specifications do not matter.
+                  </p>
+                </div>
+              </button>
 
               {files.length === 0 ? (
                 <div
