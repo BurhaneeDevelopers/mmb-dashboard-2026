@@ -1,35 +1,29 @@
 /**
- * Utility functions for catalogue processing
+ * Presentation helpers for masters created by the catalogue scanner.
  */
 
-// Random color picker for masters
+const MASTER_COLORS = [
+  '#6366f1', '#ec4899', '#10b981', '#f59e0b',
+  '#8b5cf6', '#3b82f6', '#ef4444',
+];
+
 export function randomColor(): string {
-  const colors = [
-    '#6366f1', '#ec4899', '#10b981', '#f59e0b', 
-    '#8b5cf6', '#3b82f6', '#ef4444'
-  ];
-  return colors[Math.floor(Math.random() * colors.length)];
+  return MASTER_COLORS[Math.floor(Math.random() * MASTER_COLORS.length)];
 }
 
-// Infer icon from master name
+/**
+ * Icon for a master, matched to the kind of measurement its column holds.
+ * Masters render `icon` directly, so this returns the glyph itself.
+ */
 export function inferIcon(masterName: string): string {
   const name = masterName.toLowerCase();
-  if (name.includes('dia') || name.includes('ø')) return '⭕';
-  if (name.includes('length') || name === 'l') return '📏';
-  if (name.includes('weight')) return '⚖️';
-  if (name.includes('force') || name.includes('load')) return '💪';
-  if (name.includes('thread') || name.includes('size')) return '🔩';
-  if (name.includes('material')) return '🔧';
-  if (name.includes('hardness')) return '💎';
+  if (/dia|ø|\bod\b|\bid\b/.test(name)) return '⭕';
+  if (/length|pitch|\bl\b/.test(name)) return '📏';
+  if (/weight|kgs?\b|n\.?w/.test(name)) return '⚖️';
+  if (/force|load/.test(name)) return '💪';
+  if (/thread|size|slot/.test(name)) return '🔩';
+  if (/material/.test(name)) return '🔧';
+  if (/hardness/.test(name)) return '💎';
+  if (/range/.test(name)) return '↔️';
   return '📐';
-}
-
-// Generate unique SKU
-export function generateSKU(productName: string, categoryId: string): string {
-  const prefix = productName
-    .replace(/[^A-Z0-9]/gi, '-')
-    .toUpperCase()
-    .slice(0, 20);
-  const suffix = Date.now().toString(36).toUpperCase();
-  return `${prefix}-${suffix}`;
 }

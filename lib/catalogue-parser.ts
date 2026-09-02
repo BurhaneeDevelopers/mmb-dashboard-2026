@@ -1,139 +1,339 @@
 /**
- * Extract product specifications from images using Google Gemini Vision API
+ * Extract product specifications from catalogue images using Google Gemini.
+ *
+ * A catalogue page is one product. That page may carry several spec tables
+ * (e.g. "Mould Clamp with Clamping Stud" and "Mould Clamp with T Bolt"); each
+ * table row is one sellable variant identified by its MODEL code.
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
-// Prompt for Gemini Vision API
-const CATALOGUE_PROMPT = `You are analyzing an industrial product catalogue page image.
-Your task: Extract ALL product specification data from this image.
+const CATALOGUE_PROMPT = `You are reading one page of an industrial product catalogue.
 
-CRITICAL RULES:
-1. Find the product name/title from the page heading
-2. Find ALL specification tables. One page may have MULTIPLE tables with different products
-3. For each table:
-   - Each ROW = one product variant
-   - Each COLUMN HEADER = one master (specification attribute)
-   - Extract EVERY row as a separate product variant with ALL its column values
-   - DO NOT skip rows with duplicate or similar values
-   - Include empty values as null or "-" to maintain data integrity
-4. IGNORE: company name, logo, address, phone, email, website, page numbers,
-   footnotes, ordering examples, technical diagrams/drawings, stock symbols (✓ ●)
-5. If ONE table → multiple product variants. If TWO separate titled tables → two product groups
+Extract every specification table on the page. Return JSON only.
 
-Return this exact JSON structure:
+STRUCTURE
+- The page heading is the product name (e.g. "MOULD CLAMP").
+- A page can contain SEVERAL products, each with its own main heading
+  (e.g. "MOULD CLAMP" and "U - CLAMP" on the same page). Those are separate products.
+- A product can have SEVERAL tables under sub-headings
+  (e.g. "MOULD CLAMP - WITH CLAMPING STUD" and "MOULD CLAMP WITH T BOLT").
+  Those are the SAME product. Put both tables in that product's "tables" array
+  and record each sub-heading in "tableTitle".
+
+TABLES
+- The first column is almost always the MODEL / PART NO / CODE column. Record
+  its header in "modelColumn" and never treat it as a specification.
+- Every other column header is a specification attribute.
+- Every table ROW is one variant. Extract EVERY row, in printed order, even when
+  values repeat between rows. Do not merge, summarise, deduplicate or skip rows.
+- Give each row its model code verbatim as printed, including letter suffixes
+  (RMC-12, RMC-12A, RMC-12B). Do not correct, renumber or reformat the code.
+- Put every other cell of that row into "specifications", keyed by the EXACT
+  column header text as printed.
+- A cell that is blank or "-" becomes null. Keep the key.
+- Every row of one table must have the same set of specification keys.
+
+IGNORE
+Company name, logo, address, phone, email, website, page numbers, footnotes,
+ordering examples, technical drawings and diagrams, stock symbols.
+Descriptive paragraphs are context, not data.
+
+Return exactly this JSON shape:
 {
-  "productName": "primary product name from page heading",
   "products": [
     {
-      "name": "specific product name for this table section",
-      "variants": [
+      "name": "MOULD CLAMP",
+      "description": "one sentence from the page describing the product, or null",
+      "tables": [
         {
-          "variantName": "descriptive name based on key distinguishing values",
-          "specifications": {
-            "Column Header 1": "value1",
-            "Column Header 2": "value2",
-            "Column Header 3": "value3"
-          }
-        }
-      ],
-      "masters": [
-        {
-          "name": "exact column header",
-          "label": "exact column header",
-          "type": "select",
-          "unit": "mm | g | N | bar | null",
-          "values": ["val1", "val2", "val3"]
+          "tableTitle": "MOULD CLAMP - WITH CLAMPING STUD",
+          "modelColumn": "MODEL",
+          "columns": [
+            { "header": "dO x PITCH x L", "unit": "mm" },
+            { "header": "CLAMPING RANGE B", "unit": "mm" },
+            { "header": "N.W KGS", "unit": "kg" }
+          ],
+          "rows": [
+            {
+              "model": "RMC-12",
+              "specifications": {
+                "dO x PITCH x L": "STUD M12 X 1.75 X 100",
+                "CLAMPING RANGE B": "0-35",
+                "N.W KGS": "0.99"
+              }
+            }
+          ]
         }
       ]
     }
   ]
 }
 
-Unit detection rules:
-- Header contains "mm" or dimension letters (L, d1, d2, H, S, k, OD, ID) → "mm"
-- Header contains "g" or "weight" or "gram" → "g"
-- Header contains "N" or "force" or "load" → "N"
-- Header contains "bar" or "Bar" or "pressure" → "bar"
-- Header contains "N-m" or "Nm" or "torque" → "N-m"
-- Otherwise → null
+UNIT RULES for each column:
+- dimension headers (mm, L, W, H, h, d, dO, A, B, C, OD, ID, PITCH) -> "mm"
+- weight headers (KGS, KG, N.W) -> "kg"; gram headers -> "g"
+- force or load headers -> "N"; pressure -> "bar"; torque -> "N-m"
+- anything else -> null
 
-IMPORTANT: Extract EVERY row from the table, even if some values repeat. Each row represents a distinct product variant.`;
+Accuracy of the model codes and of the row-to-value pairing matters more than
+anything else. Re-read each row before returning it.`;
 
-// Return types
-export interface ParsedMaster {
-  name: string;
-  label: string;
-  type: string;
+export interface ParsedColumn {
+  header: string;
   unit: string | null;
-  values: string[];
 }
 
-export interface ProductVariant {
-  variantName: string;
-  specifications: Record<string, string>;
+export interface ParsedRow {
+  /** Model code exactly as printed in the catalogue. */
+  model: string;
+  specifications: Record<string, string | null>;
+}
+
+export interface ParsedTable {
+  tableTitle: string | null;
+  modelColumn: string;
+  columns: ParsedColumn[];
+  rows: ParsedRow[];
 }
 
 export interface ParsedProduct {
   name: string;
-  variants?: ProductVariant[];
-  masters: ParsedMaster[];
+  description: string | null;
+  tables: ParsedTable[];
 }
 
 export interface ParseResult {
   products: ParsedProduct[];
+  /** Non-fatal problems worth showing the user in the review screen. */
+  warnings: string[];
+}
+
+const MODEL_HEADER_PATTERN = /^(model|part\s*(no|name|number)?|code|sku|cat\.?\s*no|item)/i;
+
+/** Gemini occasionally wraps JSON in prose or a code fence. Recover it. */
+function extractJson(text: string): string {
+  const trimmed = text.trim();
+  if (trimmed.startsWith('{')) return trimmed;
+
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fenced) return fenced[1].trim();
+
+  const first = trimmed.indexOf('{');
+  const last = trimmed.lastIndexOf('}');
+  if (first !== -1 && last > first) return trimmed.slice(first, last + 1);
+
+  return trimmed;
+}
+
+function cleanCell(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const text = String(value).trim();
+  if (!text || text === '-' || text === '--' || text.toLowerCase() === 'n/a') return null;
+  return text;
+}
+
+function inferUnit(header: string): string | null {
+  const h = header.toLowerCase();
+  if (/\b(kgs?|n\.?w)\b/.test(h)) return 'kg';
+  if (/gram/.test(h)) return 'g';
+  if (/\bn-?m\b|torque/.test(h)) return 'N-m';
+  if (/\bbar\b|pressure/.test(h)) return 'bar';
+  if (/\bforce\b|\bload\b/.test(h)) return 'N';
+  if (/\bmm\b|pitch|length|breadth|width|height|dia|range|slot|\bod\b|\bid\b/.test(h)) return 'mm';
+  return null;
 }
 
 /**
- * Parse a catalogue image using Gemini Vision API
+ * Force the model's output into the documented shape.
+ *
+ * The scanner used to trust the response as-is, so a shifted key or a missing
+ * array turned into silently wrong products. Everything questionable is either
+ * repaired here or reported as a warning for the review screen.
  */
+function normalizeParseResult(raw: any): ParseResult {
+  const warnings: string[] = [];
+  const products: ParsedProduct[] = [];
+
+  const rawProducts = Array.isArray(raw?.products) ? raw.products : [];
+  if (rawProducts.length === 0) {
+    warnings.push('The scan returned no products for this page.');
+  }
+
+  for (const rawProduct of rawProducts) {
+    const name = cleanCell(rawProduct?.name);
+    if (!name) {
+      warnings.push('Skipped a product because it had no name.');
+      continue;
+    }
+
+    const rawTables = Array.isArray(rawProduct?.tables) ? rawProduct.tables : [];
+    const tables: ParsedTable[] = [];
+
+    for (const rawTable of rawTables) {
+      const rawRows = Array.isArray(rawTable?.rows) ? rawTable.rows : [];
+      if (rawRows.length === 0) {
+        warnings.push(`"${name}": a table was returned with no rows.`);
+        continue;
+      }
+
+      const modelColumn = cleanCell(rawTable?.modelColumn) ?? 'MODEL';
+
+      // Column list, rebuilt from the rows so a header the model listed but
+      // never used cannot create an empty master.
+      const headerSet = new Set<string>();
+      for (const rawRow of rawRows) {
+        const specs = rawRow?.specifications;
+        if (specs && typeof specs === 'object') {
+          Object.keys(specs).forEach((key) => {
+            const header = key.trim();
+            // A model column echoed into the specs is not a specification.
+            if (header && header !== modelColumn && !MODEL_HEADER_PATTERN.test(header)) {
+              headerSet.add(header);
+            }
+          });
+        }
+      }
+
+      const declaredUnits = new Map<string, string | null>();
+      if (Array.isArray(rawTable?.columns)) {
+        for (const col of rawTable.columns) {
+          const header = cleanCell(col?.header);
+          if (header) declaredUnits.set(header, cleanCell(col?.unit));
+        }
+      }
+
+      const columns: ParsedColumn[] = [...headerSet].map((header) => ({
+        header,
+        unit: declaredUnits.get(header) ?? inferUnit(header),
+      }));
+
+      if (columns.length === 0) {
+        warnings.push(`"${name}": a table had model codes but no specification columns.`);
+        continue;
+      }
+
+      const rows: ParsedRow[] = [];
+      const seenModels = new Set<string>();
+
+      for (const rawRow of rawRows) {
+        const model =
+          cleanCell(rawRow?.model) ??
+          cleanCell(rawRow?.specifications?.[modelColumn]);
+
+        if (!model) {
+          warnings.push(`"${name}": skipped a row with no model code.`);
+          continue;
+        }
+
+        if (seenModels.has(model.toUpperCase())) {
+          warnings.push(`"${name}": model "${model}" appeared twice in one table, kept the first row.`);
+          continue;
+        }
+        seenModels.add(model.toUpperCase());
+
+        const specifications: Record<string, string | null> = {};
+        for (const col of columns) {
+          specifications[col.header] = cleanCell(rawRow?.specifications?.[col.header]);
+        }
+
+        const filled = Object.values(specifications).filter((v) => v !== null).length;
+        if (filled === 0) {
+          warnings.push(`"${name}": model "${model}" had no readable specification values.`);
+          continue;
+        }
+
+        rows.push({ model, specifications });
+      }
+
+      if (rows.length === 0) {
+        warnings.push(`"${name}": a table produced no usable rows.`);
+        continue;
+      }
+
+      tables.push({
+        tableTitle: cleanCell(rawTable?.tableTitle),
+        modelColumn,
+        columns,
+        rows,
+      });
+    }
+
+    if (tables.length === 0) {
+      warnings.push(`"${name}": no usable specification table was found.`);
+      continue;
+    }
+
+    products.push({
+      name,
+      description: cleanCell(rawProduct?.description),
+      tables,
+    });
+  }
+
+  return { products, warnings };
+}
+
 export async function parseCatalogueImage(file: File): Promise<ParseResult> {
   const startTime = Date.now();
+
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error('GEMINI_API_KEY is not configured on the server.');
+  }
+
+  const bytes = await file.arrayBuffer();
+  const base64 = Buffer.from(bytes).toString('base64');
+  const mimeType = file.type || 'image/png';
+
+  console.log(`[catalogue-parser] Parsing ${file.name} (${(file.size / 1024).toFixed(2)} KB)`);
+
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-3.1-flash-lite-preview',
+    generationConfig: {
+      responseMimeType: 'application/json',
+      temperature: 0,
+      maxOutputTokens: 32768,
+    },
+  });
+
+  let text: string;
   try {
-    // Convert File to base64
-    const bytes = await file.arrayBuffer();
-    const base64 = Buffer.from(bytes).toString('base64');
-    const mimeType = file.type as 'image/jpeg' | 'image/png';
-
-    console.log(`[catalogue-parser] Starting parse for ${file.name} (${(file.size / 1024).toFixed(2)} KB)`);
-
-    // Configure Gemini model - using flash-lite for faster processing
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-3.1-flash-lite-preview',
-      generationConfig: {
-        responseMimeType: 'application/json',
-        temperature: 0.1,
-        maxOutputTokens: 8192,
-      },
-    });
-
-    // Send to Gemini
     const result = await model.generateContent([
-      {
-        inlineData: {
-          mimeType,
-          data: base64,
-        },
-      },
+      { inlineData: { mimeType, data: base64 } },
       CATALOGUE_PROMPT,
     ]);
-
-    const response = await result.response;
-    const text = response.text();
-    const parseTime = Date.now() - startTime;
-    console.log(`[catalogue-parser] Gemini response received in ${parseTime}ms, parsing JSON...`);
-    
-    const parsed = JSON.parse(text) as ParseResult;
-    const totalTime = Date.now() - startTime;
-    console.log(`[catalogue-parser] Successfully parsed ${file.name} in ${totalTime}ms`);
-
-    return parsed;
+    text = result.response.text();
   } catch (error) {
-    const totalTime = Date.now() - startTime;
-    console.error(`[catalogue-parser] Error after ${totalTime}ms:`, error);
-    throw new Error(`Failed to parse image: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    console.error(`[catalogue-parser] Gemini call failed for ${file.name}:`, error);
+    throw new Error(
+      `Could not read ${file.name}: ${error instanceof Error ? error.message : 'the AI service did not respond'}`
+    );
   }
+
+  // A truncated response is the usual cause of a scan that "mostly worked":
+  // JSON.parse throws and the whole page is lost. Say so plainly instead.
+  let raw: unknown;
+  try {
+    raw = JSON.parse(extractJson(text));
+  } catch {
+    console.error(`[catalogue-parser] Unparseable response for ${file.name}:`, text.slice(0, 500));
+    throw new Error(
+      `The scan of ${file.name} came back incomplete, usually because the page holds a very large table. Try cropping the page into two images.`
+    );
+  }
+
+  const parsed = normalizeParseResult(raw);
+  const rowCount = parsed.products.reduce(
+    (sum, p) => sum + p.tables.reduce((s, t) => s + t.rows.length, 0),
+    0
+  );
+
+  console.log(
+    `[catalogue-parser] ${file.name}: ${parsed.products.length} product(s), ${rowCount} variant row(s), ` +
+      `${parsed.warnings.length} warning(s) in ${Date.now() - startTime}ms`
+  );
+
+  return parsed;
 }

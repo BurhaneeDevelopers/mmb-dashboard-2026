@@ -1,5 +1,62 @@
 import { supabase } from './client';
-import type { Product, CreateProductInput, UpdateProductInput, MasterValue } from './types';
+import type { Product, ProductVariant, CreateProductInput, UpdateProductInput, MasterValue } from './types';
+
+export const MAX_PRODUCT_IMAGES = 5;
+
+// Nested select used everywhere a full product is read
+const PRODUCT_SELECT = `
+        *,
+        product_master_values(
+          master_values(
+            id,
+            value,
+            master_field_id
+          )
+        ),
+        product_variants(
+          id,
+          product_id,
+          sku,
+          source_sku,
+          variant_label,
+          sort_order,
+          status,
+          product_variant_values(
+            master_values(
+              id,
+              value,
+              master_field_id
+            )
+          )
+        )
+      `;
+
+const transformVariant = (row: any): ProductVariant => {
+  const values: Record<string, string> = {};
+  const masterValueIds: string[] = [];
+
+  if (Array.isArray(row.product_variant_values)) {
+    row.product_variant_values.forEach((pvv: any) => {
+      const masterValue = pvv.master_values;
+      if (masterValue?.master_field_id && masterValue.value && masterValue.id) {
+        values[masterValue.master_field_id] = masterValue.value;
+        masterValueIds.push(masterValue.id);
+      }
+    });
+  }
+
+  return {
+    id: row.id,
+    productId: row.product_id,
+    sku: row.sku,
+    sourceSku: row.source_sku || undefined,
+    variantLabel: row.variant_label || undefined,
+    sortOrder: row.sort_order ?? 0,
+    status: row.status,
+    values,
+    masterValueIds,
+  };
+};
 
 // Transform database row to application type
 const transformProduct = (row: any): Product => {
@@ -29,6 +86,17 @@ const transformProduct = (row: any): Product => {
     });
   }
   
+  // images[] is the source of truth; image_url is the legacy single image and
+  // is folded in so products saved before the gallery existed still show one.
+  const images: string[] = Array.isArray(row.images) ? row.images.filter(Boolean) : [];
+  if (images.length === 0 && row.image_url) {
+    images.push(row.image_url);
+  }
+
+  const variants: ProductVariant[] = Array.isArray(row.product_variants)
+    ? row.product_variants.map(transformVariant).sort((a: ProductVariant, b: ProductVariant) => a.sortOrder - b.sortOrder)
+    : [];
+
   return {
     id: row.id,
     name: row.name,
@@ -38,7 +106,10 @@ const transformProduct = (row: any): Product => {
     status: row.status,
     masterValues,
     masterValueIds,
-    imageUrl: row.image_url || undefined,
+    images,
+    catalogueImageUrl: row.catalogue_image_url || undefined,
+    imageUrl: images[0] || undefined,
+    variants,
     createdAt: row.created_at,
   };
 };
@@ -48,16 +119,7 @@ export const productsService = {
   async getAll(): Promise<Product[]> {
     const { data, error } = await supabase
       .from('products')
-      .select(`
-        *,
-        product_master_values(
-          master_values(
-            id,
-            value,
-            master_field_id
-          )
-        )
-      `)
+      .select(PRODUCT_SELECT)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -68,16 +130,7 @@ export const productsService = {
   async getById(id: string): Promise<Product> {
     const { data, error } = await supabase
       .from('products')
-      .select(`
-        *,
-        product_master_values(
-          master_values(
-            id,
-            value,
-            master_field_id
-          )
-        )
-      `)
+      .select(PRODUCT_SELECT)
       .eq('id', id)
       .single();
 
@@ -89,16 +142,7 @@ export const productsService = {
   async getByCategory(categoryId: string): Promise<Product[]> {
     const { data, error } = await supabase
       .from('products')
-      .select(`
-        *,
-        product_master_values(
-          master_values(
-            id,
-            value,
-            master_field_id
-          )
-        )
-      `)
+      .select(PRODUCT_SELECT)
       .eq('category_id', categoryId)
       .order('created_at', { ascending: false });
 
@@ -110,16 +154,7 @@ export const productsService = {
   async getByStatus(status: 'active' | 'inactive' | 'draft'): Promise<Product[]> {
     const { data, error } = await supabase
       .from('products')
-      .select(`
-        *,
-        product_master_values(
-          master_values(
-            id,
-            value,
-            master_field_id
-          )
-        )
-      `)
+      .select(PRODUCT_SELECT)
       .eq('status', status)
       .order('created_at', { ascending: false });
 
@@ -134,16 +169,7 @@ export const productsService = {
   }): Promise<Product[]> {
     let queryBuilder = supabase
       .from('products')
-      .select(`
-        *,
-        product_master_values(
-          master_values(
-            id,
-            value,
-            master_field_id
-          )
-        )
-      `);
+      .select(PRODUCT_SELECT);
 
     if (query) {
       queryBuilder = queryBuilder.or(`name.ilike.%${query}%,sku.ilike.%${query}%`);
@@ -190,6 +216,10 @@ export const productsService = {
 
   // Create product
   async create(input: CreateProductInput): Promise<Product> {
+    const images = (input.images ?? (input.imageUrl ? [input.imageUrl] : []))
+      .filter(Boolean)
+      .slice(0, MAX_PRODUCT_IMAGES);
+
     // Insert product
     const { data: productData, error: productError } = await supabase
       .from('products')
@@ -199,7 +229,10 @@ export const productsService = {
         description: input.description || null,
         category_id: input.categoryId,
         status: input.status,
-        image_url: input.imageUrl || null,
+        images,
+        catalogue_image_url: input.catalogueImageUrl || null,
+        // Kept in step with images[0] for screens still reading a single image.
+        image_url: images[0] ?? null,
       })
       .select()
       .single();
@@ -237,7 +270,16 @@ export const productsService = {
     if (input.description !== undefined) updateData.description = input.description || null;
     if (input.categoryId !== undefined) updateData.category_id = input.categoryId;
     if (input.status !== undefined) updateData.status = input.status;
-    if (input.imageUrl !== undefined) updateData.image_url = input.imageUrl || null;
+    if (input.catalogueImageUrl !== undefined) {
+      updateData.catalogue_image_url = input.catalogueImageUrl || null;
+    }
+    if (input.images !== undefined) {
+      const images = input.images.filter(Boolean).slice(0, MAX_PRODUCT_IMAGES);
+      updateData.images = images;
+      updateData.image_url = images[0] ?? null;
+    } else if (input.imageUrl !== undefined) {
+      updateData.image_url = input.imageUrl || null;
+    }
 
     const { error } = await supabase
       .from('products')
@@ -324,16 +366,7 @@ export const productsService = {
 
     const { data, error } = await supabase
       .from('products')
-      .select(`
-        *,
-        product_master_values(
-          master_values(
-            id,
-            value,
-            master_field_id
-          )
-        )
-      `)
+      .select(PRODUCT_SELECT)
       .gte('created_at', cutoffDate.toISOString())
       .order('created_at', { ascending: false });
 
@@ -341,11 +374,98 @@ export const productsService = {
     return data.map(transformProduct);
   },
 
+  /**
+   * Replace a product's variants with the given rows.
+   *
+   * Variants are rewritten wholesale rather than diffed: a catalogue table is
+   * edited as a table, and the value links hang off the variant rows anyway.
+   */
+  async replaceVariants(
+    productId: string,
+    variants: Array<{
+      sku: string;
+      sourceSku?: string | null;
+      variantLabel?: string | null;
+      status?: 'active' | 'inactive' | 'draft';
+      /** master_value ids making up this variant's spec combination */
+      masterValueIds: string[];
+    }>
+  ): Promise<void> {
+    const { error: deleteError } = await supabase
+      .from('product_variants')
+      .delete()
+      .eq('product_id', productId);
+
+    if (deleteError) throw deleteError;
+
+    if (variants.length === 0) return;
+
+    const { data: inserted, error: insertError } = await supabase
+      .from('product_variants')
+      .insert(
+        variants.map((variant, index) => ({
+          product_id: productId,
+          sku: variant.sku.trim().toUpperCase(),
+          source_sku: variant.sourceSku ?? null,
+          variant_label: variant.variantLabel ?? null,
+          sort_order: index,
+          status: variant.status ?? 'active',
+        }))
+      )
+      .select('id, sku');
+
+    if (insertError) {
+      if (insertError.code === '23505') {
+        throw new Error('One of these variant SKUs already exists');
+      }
+      throw insertError;
+    }
+
+    const idBySku = new Map((inserted ?? []).map((row) => [row.sku, row.id]));
+    const valueRows: Array<{ variant_id: string; master_value_id: string }> = [];
+
+    for (const variant of variants) {
+      const variantId = idBySku.get(variant.sku.trim().toUpperCase());
+      if (!variantId) continue;
+
+      for (const masterValueId of [...new Set(variant.masterValueIds)]) {
+        valueRows.push({ variant_id: variantId, master_value_id: masterValueId });
+      }
+    }
+
+    if (valueRows.length > 0) {
+      const { error: valueError } = await supabase
+        .from('product_variant_values')
+        .insert(valueRows);
+
+      if (valueError) throw valueError;
+    }
+  },
+
+  /** Variant SKUs are unique across the whole catalogue. */
+  async variantSkuExists(sku: string, excludeProductId?: string): Promise<boolean> {
+    let query = supabase
+      .from('product_variants')
+      .select('id')
+      .eq('sku', sku.trim().toUpperCase())
+      .limit(1);
+
+    if (excludeProductId) {
+      query = query.neq('product_id', excludeProductId);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data.length > 0;
+  },
+
   // Upload product image
   async uploadImage(file: File, productId: string): Promise<string> {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${productId}-${Date.now()}.${fileExt}`;
-    const filePath = `${fileName}`;
+    const fileExt = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    // The random segment keeps two files uploaded in the same millisecond from
+    // colliding, which previously failed the whole save.
+    const unique = Math.random().toString(36).slice(2, 8);
+    const filePath = `${productId}-${Date.now()}-${unique}.${fileExt}`;
 
     const { error: uploadError } = await supabase.storage
       .from('product-images')
@@ -361,6 +481,11 @@ export const productsService = {
       .getPublicUrl(filePath);
 
     return data.publicUrl;
+  },
+
+  /** Upload several images at once, preserving their order. */
+  async uploadImages(files: File[], productId: string): Promise<string[]> {
+    return Promise.all(files.map((file) => this.uploadImage(file, productId)));
   },
 
   // Delete product image

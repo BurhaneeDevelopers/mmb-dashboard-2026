@@ -3,22 +3,13 @@ import { Info, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import MultiSelect from "@/components/MultiSelect";
 import type { Master } from "@/lib/supabase/types";
+import type { ProductFormData } from "./types";
 
-type FormData = {
-  name: string;
-  sku: string;
-  categoryId: string;
-  description: string;
-  status: "active" | "inactive" | "draft";
-  masterValues: Record<string, string[]>;
-  imageUrl?: string;
-  imageFile?: File;
-};
 
 interface AttributesSectionProps {
   categoryId: string;
   masters: Master[];
-  formik: FormikProps<FormData>;
+  formik: FormikProps<ProductFormData>;
 }
 
 export function AttributesSection({ categoryId, masters, formik }: AttributesSectionProps) {
@@ -33,7 +24,7 @@ export function AttributesSection({ categoryId, masters, formik }: AttributesSec
     return (
       <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm animate-fade-in-up">
         <div className="flex items-center gap-2 mb-5">
-          <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 text-xs font-bold flex items-center justify-center">3</div>
+          <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 text-xs font-bold flex items-center justify-center">4</div>
           <h2 className="text-sm font-semibold text-slate-700">Product Attributes</h2>
         </div>
 
@@ -56,7 +47,7 @@ export function AttributesSection({ categoryId, masters, formik }: AttributesSec
     <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm animate-fade-in-up">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 text-xs font-bold flex items-center justify-center">3</div>
+          <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 text-xs font-bold flex items-center justify-center">4</div>
           <h2 className="text-sm font-semibold text-slate-700">Select Values from Masters</h2>
         </div>
         <span className="text-xs bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-full font-medium">

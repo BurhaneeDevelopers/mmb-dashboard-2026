@@ -1,164 +1,109 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { parseCatalogueImage } from '@/lib/catalogue-parser';
-import { importProduct } from '@/lib/product-importer';
+import { parseCatalogueImage, type ParseResult } from '@/lib/catalogue-parser';
 
 export const runtime = 'nodejs';
-export const maxDuration = 300; // 5 minutes timeout for image processing
+export const maxDuration = 300;
 
-interface ProcessResult {
+const MAX_IMAGES = 5;
+const MAX_BYTES = 10 * 1024 * 1024;
+
+interface ScanResponseItem {
   filename: string;
   success: boolean;
-  productId?: string;
-  productName?: string;
+  result?: ParseResult;
   error?: string;
-  isUpdate?: boolean;
-  matchedProductName?: string;
-  similarity?: number;
 }
 
-interface ApiSummary {
-  totalImages: number;
-  imagesProcessed: number;
-  imagesFailed: number;
-  productsCreated: number;
-  productsUpdated: number;
-}
-
+/**
+ * Read catalogue pages and return a draft for review.
+ *
+ * This endpoint no longer writes to the database. It used to create products
+ * straight from the model's output, so any misread went in unseen; the client
+ * now shows the draft, the user corrects it, and the import runs from there.
+ */
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
-  
+
   try {
     const formData = await request.formData();
-    const categoryId = formData.get('categoryId') as string;
-    const images = formData.getAll('images') as File[];
+    const images = formData.getAll('images').filter((f): f is File => f instanceof File);
 
-    console.log(`[letterhead-process] Starting processing: ${images.length} images, category: ${categoryId}`);
+    if (images.length === 0) {
+      return NextResponse.json({ error: 'At least one image is required' }, { status: 400 });
+    }
 
-    // Validation
-    if (!categoryId) {
+    if (images.length > MAX_IMAGES) {
       return NextResponse.json(
-        { error: 'Category ID is required' },
+        { error: `Maximum ${MAX_IMAGES} images per scan` },
         { status: 400 }
       );
     }
 
-    if (!images || images.length === 0) {
-      return NextResponse.json(
-        { error: 'At least one image is required' },
-        { status: 400 }
-      );
-    }
-
-    if (images.length > 4) {
-      return NextResponse.json(
-        { error: 'Maximum 4 images allowed' },
-        { status: 400 }
-      );
-    }
-
-    // Validate file types
     for (const image of images) {
       if (!image.type.startsWith('image/')) {
         return NextResponse.json(
-          { error: `Invalid file type: ${image.name}. Only images are allowed.` },
+          { error: `${image.name} is not an image file` },
+          { status: 400 }
+        );
+      }
+      if (image.size > MAX_BYTES) {
+        return NextResponse.json(
+          { error: `${image.name} is larger than 10MB` },
           { status: 400 }
         );
       }
     }
 
-    const results: ProcessResult[] = [];
-    let imagesProcessed = 0;
-    let imagesFailed = 0;
-    let productsCreated = 0;
-    let productsUpdated = 0;
-
-    // Process each image
-    for (const image of images) {
-      const imageStartTime = Date.now();
-      try {
-        console.log(`[letterhead-process] Processing image: ${image.name} (${(image.size / 1024).toFixed(2)} KB)`);
-        
-        // Parse image with Gemini
-        const parseResult = await parseCatalogueImage(image);
-        const parseTime = Date.now() - imageStartTime;
-        console.log(`[letterhead-process] Parsed ${image.name} in ${parseTime}ms, found ${parseResult.products?.length || 0} products`);
-        
-        if (!parseResult.products || parseResult.products.length === 0) {
-          results.push({
+    // Pages are independent, so read them together rather than one after
+    // another. A single failed page no longer costs the whole batch.
+    const scans: ScanResponseItem[] = await Promise.all(
+      images.map(async (image) => {
+        try {
+          const result = await parseCatalogueImage(image);
+          return { filename: image.name, success: true, result };
+        } catch (error) {
+          console.error(`[letterhead-process] ${image.name} failed:`, error);
+          return {
             filename: image.name,
             success: false,
-            error: 'No products detected in image',
-          });
-          imagesFailed++;
-          continue;
+            error: error instanceof Error ? error.message : 'Could not read this image',
+          };
         }
+      })
+    );
 
-        // Import each product detected in the image
-        for (const product of parseResult.products) {
-          const importStartTime = Date.now();
-          const importResult = await importProduct(product, categoryId, {
-            updateExisting: true,
-            similarityThreshold: 0.8,
-          });
-          const importTime = Date.now() - importStartTime;
-          console.log(`[letterhead-process] Imported "${product.name}" in ${importTime}ms, success: ${importResult.success}`);
-          
-          results.push({
-            filename: image.name,
-            success: importResult.success,
-            productId: importResult.productId,
-            productName: importResult.productName,
-            error: importResult.error,
-            isUpdate: importResult.isUpdate,
-            matchedProductName: importResult.matchedProductName,
-            similarity: importResult.similarity,
-          });
+    const productCount = scans.reduce((sum, s) => sum + (s.result?.products.length ?? 0), 0);
+    const variantCount = scans.reduce(
+      (sum, s) =>
+        sum +
+        (s.result?.products.reduce(
+          (inner, p) => inner + p.tables.reduce((t, table) => t + table.rows.length, 0),
+          0
+        ) ?? 0),
+      0
+    );
 
-          if (importResult.success) {
-            if (importResult.isUpdate) {
-              productsUpdated++;
-            } else {
-              productsCreated++;
-            }
-          }
-        }
-
-        imagesProcessed++;
-        const imageTime = Date.now() - imageStartTime;
-        console.log(`[letterhead-process] Completed ${image.name} in ${imageTime}ms`);
-      } catch (error) {
-        console.error(`[letterhead-process] Error processing image ${image.name}:`, error);
-        results.push({
-          filename: image.name,
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
-        imagesFailed++;
-      }
-    }
-
-    const totalTime = Date.now() - startTime;
-    console.log(`[letterhead-process] Completed all processing in ${totalTime}ms`);
-
-    const summary: ApiSummary = {
-      totalImages: images.length,
-      imagesProcessed,
-      imagesFailed,
-      productsCreated,
-      productsUpdated,
-    };
+    console.log(
+      `[letterhead-process] Scanned ${images.length} image(s) in ${Date.now() - startTime}ms: ` +
+        `${productCount} product(s), ${variantCount} variant(s)`
+    );
 
     return NextResponse.json({
-      results,
-      summary,
+      scans,
+      summary: {
+        totalImages: images.length,
+        imagesScanned: scans.filter((s) => s.success).length,
+        imagesFailed: scans.filter((s) => !s.success).length,
+        productsFound: productCount,
+        variantsFound: variantCount,
+      },
     });
   } catch (error) {
-    const totalTime = Date.now() - startTime;
-    console.error(`[letterhead-process] Error after ${totalTime}ms:`, error);
+    console.error(`[letterhead-process] Failed after ${Date.now() - startTime}ms:`, error);
     return NextResponse.json(
-      { 
-        error: 'Internal server error',
-        details: error instanceof Error ? error.message : 'Unknown error'
+      {
+        error: 'Could not process the images',
+        details: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
     );
