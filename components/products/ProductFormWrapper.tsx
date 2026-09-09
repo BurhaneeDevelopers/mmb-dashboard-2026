@@ -44,7 +44,13 @@ export function ProductFormWrapper({ mode, productId }: ProductFormWrapperProps)
           description: product.description,
           status: product.status,
           masterValues: product.masterValues,
-          imageUrl: product.imageUrl,
+          images: product.images.map((url, index) => ({
+            id: `stored-${index}-${url}`,
+            url,
+          })),
+          catalogueImage: product.catalogueImageUrl
+            ? { id: "stored-catalogue", url: product.catalogueImageUrl }
+            : undefined,
         }}
       />
     );
@@ -60,6 +66,8 @@ export function ProductFormWrapper({ mode, productId }: ProductFormWrapperProps)
         description: "",
         status: "active",
         masterValues: {},
+        images: [],
+        catalogueImage: undefined,
       }}
     />
   );

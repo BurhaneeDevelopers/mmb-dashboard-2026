@@ -10,18 +10,9 @@ import { productsService } from "@/lib/supabase/products.service";
 import { BasicInfoSection } from "./form-sections/BasicInfoSection";
 import { AttributesSection } from "./form-sections/AttributesSection";
 import { CategorySection } from "./form-sections/CategorySection";
-import { ImageUpload } from "./ImageUpload";
-
-type FormData = {
-  name: string;
-  sku: string;
-  categoryId: string;
-  description: string;
-  status: "active" | "inactive" | "draft";
-  masterValues: Record<string, string[]>;
-  imageUrl?: string;
-  imageFile?: File;
-};
+import { MediaSection } from "./form-sections/MediaSection";
+import type { ProductFormData as FormData } from "./form-sections/types";
+import { MAX_PRODUCT_IMAGES } from "@/lib/supabase/products.service";
 
 interface ProductFormProps {
   mode: "create" | "edit";
@@ -60,19 +51,29 @@ export function ProductForm({ mode, initialData, productId }: ProductFormProps) 
       description: "",
       status: "active",
       masterValues: {},
-      imageUrl: undefined,
-      imageFile: undefined,
+      images: [],
+      catalogueImage: undefined,
     },
     validationSchema,
     onSubmit: async (values: FormData) => {
       try {
-        let imageUrl = values.imageUrl;
+        const uploadId = productId || `temp-${Date.now()}`;
 
-        // Handle image upload if there's a new image file
-        if (values.imageFile) {
-          const tempId = productId || `temp-${Date.now()}`;
-          imageUrl = await productsService.uploadImage(values.imageFile, tempId);
-        }
+        // Upload only the images picked in this session; ones already stored
+        // keep their existing URL.
+        const imageUrls = await Promise.all(
+          values.images.map((image) =>
+            image.file
+              ? productsService.uploadImage(image.file, uploadId)
+              : Promise.resolve(image.url)
+          )
+        );
+
+        const catalogueImageUrl = values.catalogueImage
+          ? values.catalogueImage.file
+            ? await productsService.uploadImage(values.catalogueImage.file, `${uploadId}-catalogue`)
+            : values.catalogueImage.url
+          : null;
 
         // Convert masterValues (field_id -> values[]) to masterValueIds
         const masterValueIds = await productsService.convertMasterValuesToIds(values.masterValues);
@@ -87,7 +88,8 @@ export function ProductForm({ mode, initialData, productId }: ProductFormProps) 
               description: values.description || undefined,
               status: values.status,
               masterValueIds,
-              imageUrl,
+              images: imageUrls,
+              catalogueImageUrl,
             },
           });
           toast.success(`Product "${values.name}" updated!`);
@@ -99,7 +101,8 @@ export function ProductForm({ mode, initialData, productId }: ProductFormProps) 
             description: values.description || undefined,
             status: values.status,
             masterValueIds,
-            imageUrl,
+            images: imageUrls,
+            catalogueImageUrl,
           });
           toast.success(`Product "${values.name}" created!`);
         }
@@ -162,38 +165,15 @@ export function ProductForm({ mode, initialData, productId }: ProductFormProps) 
       <form onSubmit={formik.handleSubmit} className="space-y-6">
         <BasicInfoSection formik={formik} />
 
-        {/* Image Upload Section */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-sm">
-              📸
-            </div>
-            <div>
-              <h3 className="font-semibold text-slate-800">Product Image</h3>
-              <p className="text-xs text-slate-500">Upload a product image (optional)</p>
-            </div>
-          </div>
-          <ImageUpload
-            value={formik.values.imageUrl}
-            onChange={(url) => {
-              if (url?.startsWith('data:')) {
-                // It's a base64 data URL from file selection
-                // Convert to File object
-                fetch(url)
-                  .then(res => res.blob())
-                  .then(blob => {
-                    const file = new File([blob], 'product-image.jpg', { type: blob.type });
-                    formik.setFieldValue('imageFile', file);
-                    formik.setFieldValue('imageUrl', url);
-                  });
-              } else {
-                formik.setFieldValue('imageUrl', url);
-                formik.setFieldValue('imageFile', undefined);
-              }
-            }}
-            disabled={formik.isSubmitting}
-          />
-        </div>
+        <MediaSection
+          stepNumber={2}
+          catalogueImage={formik.values.catalogueImage}
+          onCatalogueImageChange={(image) => formik.setFieldValue("catalogueImage", image)}
+          images={formik.values.images}
+          onImagesChange={(images) => formik.setFieldValue("images", images)}
+          maxImages={MAX_PRODUCT_IMAGES}
+          disabled={formik.isSubmitting}
+        />
 
         <CategorySection
           selectedCategoryId={formik.values.categoryId}

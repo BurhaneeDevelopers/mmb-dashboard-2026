@@ -2,29 +2,20 @@ import { FormikProps } from "formik";
 import { CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Category } from "@/lib/supabase/types";
+import type { ProductFormData } from "./types";
 
-type FormData = {
-  name: string;
-  sku: string;
-  categoryId: string;
-  description: string;
-  status: "active" | "inactive" | "draft";
-  masterValues: Record<string, string[]>;
-  imageUrl?: string;
-  imageFile?: File;
-};
 
 interface CategorySectionProps {
   selectedCategoryId: string;
   categories: Category[];
-  formik: FormikProps<FormData>;
+  formik: FormikProps<ProductFormData>;
 }
 
 export function CategorySection({ selectedCategoryId, categories, formik }: CategorySectionProps) {
   return (
     <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
       <div className="flex items-center gap-2 mb-5">
-        <div className="w-6 h-6 rounded-full bg-pink-100 text-pink-600 text-xs font-bold flex items-center justify-center">2</div>
+        <div className="w-6 h-6 rounded-full bg-pink-100 text-pink-600 text-xs font-bold flex items-center justify-center">3</div>
         <h2 className="text-sm font-semibold text-slate-700">Select Category</h2>
       </div>
 

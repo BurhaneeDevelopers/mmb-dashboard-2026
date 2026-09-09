@@ -87,7 +87,7 @@ export const categoriesService = {
         description: input.description,
         color: input.color,
         icon: input.icon,
-        parent_id: input.parentId,
+        parent_id: input.parentId || null,
         is_main: input.isMain,
       })
       .select()
@@ -106,7 +106,7 @@ export const categoriesService = {
         description: input.description,
         color: input.color,
         icon: input.icon,
-        parent_id: input.parentId,
+        parent_id: input.parentId || null,
         is_main: input.isMain,
       })
       .eq('id', id)

@@ -1,5 +1,6 @@
 import { FormikProps } from "formik";
 import { cn } from "@/lib/utils";
+import type { ProductFormData } from "./types";
 
 const STATUS_OPTIONS = [
   { value: "active", label: "Active", emoji: "🟢", desc: "Visible and available", color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-200" },
@@ -7,19 +8,9 @@ const STATUS_OPTIONS = [
   { value: "draft", label: "Draft", emoji: "📝", desc: "Work in progress", color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200" },
 ];
 
-type FormData = {
-  name: string;
-  sku: string;
-  categoryId: string;
-  description: string;
-  status: "active" | "inactive" | "draft";
-  masterValues: Record<string, string[]>;
-  imageUrl?: string;
-  imageFile?: File;
-};
 
 interface BasicInfoSectionProps {
-  formik: FormikProps<FormData>;
+  formik: FormikProps<ProductFormData>;
 }
 
 export function BasicInfoSection({ formik }: BasicInfoSectionProps) {

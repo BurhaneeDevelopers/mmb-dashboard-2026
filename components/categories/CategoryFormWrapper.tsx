@@ -37,6 +37,10 @@ export function CategoryFormWrapper({ mode, categoryId }: CategoryFormWrapperPro
           description: category.description,
           color: category.color,
           icon: category.icon,
+          // Carried through so editing a subcategory does not silently
+          // promote it back to a main category on save.
+          parentId: category.parentId ?? "",
+          isMain: category.isMain,
         }}
       />
     );
